@@ -201,8 +201,8 @@ export default function InProgressBox({
                         </div>
                       </div>
 
-                      {/* Botões e Detalhes para Mobile */}
-                      {isMobile && selectedDelivery?.id === delivery.id && (
+                      {/* Botões e Detalhes para Mobile e Desktop */}
+                      {selectedDelivery?.id === delivery.id && (
                         <motion.div
                           initial={{ height: 0, opacity: 0 }}
                           animate={{ height: "auto", opacity: 1 }}
@@ -314,331 +314,335 @@ export default function InProgressBox({
                           </div>
 
                           {/* Detalhes da Entrega */}
-                          <div className="p-4 space-y-4">
-                            {!isEditing ? (
-                              <>
-                                <div>
-                                  <label className="text-xs text-slate-400">
-                                    Cliente
-                                  </label>
-                                  <p className="text-slate-200">
-                                    {delivery.nome}
-                                  </p>
-                                </div>
-
-                                <div>
-                                  <label className="text-xs text-slate-400">
-                                    Telefone
-                                  </label>
-                                  <p className="text-slate-200">
-                                    {delivery.telefone}
-                                  </p>
-                                </div>
-
-                                <div>
-                                  <label className="text-xs text-slate-400">
-                                    Endereço
-                                  </label>
-                                  <p className="text-slate-200">
-                                    {delivery.rua}, {delivery.numero}
-                                    <br />
-                                    {delivery.bairro} - {delivery.cidade}
-                                  </p>
-                                </div>
-
-                                <div>
-                                  <label className="text-xs text-slate-400">
-                                    Volume
-                                  </label>
-                                  <p className="text-slate-200">
-                                    {delivery.volume}
-                                  </p>
-                                </div>
-
-                                <div>
-                                  <label className="text-xs text-slate-400">
-                                    Data da Entrega
-                                  </label>
-                                  <p className="text-slate-200">
-                                    {delivery.dia.join("/")}
-                                  </p>
-                                </div>
-
-                                <div>
-                                  <label className="text-xs text-slate-400">
-                                    Entregador
-                                  </label>
-                                  <p className="text-slate-200">
-                                    {delivery.entregador}
-                                  </p>
-                                </div>
-
-                                <div>
-                                  <label className="text-xs text-slate-400">
-                                    Valor
-                                  </label>
-                                  <p className="text-slate-200">
-                                    R$ {delivery.valor}
-                                  </p>
-                                </div>
-
-                                <div>
-                                  <label className="text-xs text-slate-400">
-                                    Pagamento
-                                  </label>
-                                  <p className="text-slate-200">
-                                    {delivery.pagamento}
-                                  </p>
-                                </div>
-
-                                {delivery.observacoes && (
+                          {isMobile && (
+                            <div className="p-4 space-y-4">
+                              {!isEditing ? (
+                                <>
                                   <div>
                                     <label className="text-xs text-slate-400">
-                                      Observações
+                                      Cliente
                                     </label>
                                     <p className="text-slate-200">
-                                      {delivery.observacoes}
+                                      {delivery.nome}
                                     </p>
                                   </div>
-                                )}
-                              </>
-                            ) : (
-                              // Formulário de Edição
-                              <div className="p-4">
-                                <div className="flex justify-between items-center mb-6">
-                                  <h2 className="text-xl font-bold text-white">
-                                    Editar Entrega
-                                  </h2>
-                                  <button
-                                    onClick={() => setIsEditing(false)}
-                                    className="text-slate-400 hover:text-slate-200 transition-colors"
-                                  >
-                                    <XMarkIcon className="h-6 w-6" />
-                                  </button>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-4">
-                                  <div>
-                                    <label className="block text-sm font-medium text-slate-300 mb-1">
-                                      Nome do Cliente
-                                    </label>
-                                    <input
-                                      type="text"
-                                      defaultValue={delivery.nome}
-                                      onChange={(e) =>
-                                        setEditingDelivery({
-                                          ...delivery,
-                                          nome: e.target.value,
-                                        })
-                                      }
-                                      className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:border-blue-500"
-                                    />
-                                  </div>
 
                                   <div>
-                                    <label className="block text-sm font-medium text-slate-300 mb-1">
+                                    <label className="text-xs text-slate-400">
                                       Telefone
                                     </label>
-                                    <input
-                                      type="text"
-                                      defaultValue={delivery.telefone}
-                                      onChange={(e) =>
-                                        setEditingDelivery({
-                                          ...delivery,
-                                          telefone: e.target.value,
-                                        })
-                                      }
-                                      className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:border-blue-500"
-                                    />
+                                    <p className="text-slate-200">
+                                      {delivery.telefone}
+                                    </p>
                                   </div>
 
                                   <div>
-                                    <label className="block text-sm font-medium text-slate-300 mb-1">
-                                      Cidade
+                                    <label className="text-xs text-slate-400">
+                                      Endereço
                                     </label>
-                                    <input
-                                      type="text"
-                                      defaultValue={delivery.cidade}
-                                      onChange={(e) =>
-                                        setEditingDelivery({
-                                          ...delivery,
-                                          cidade: e.target.value,
-                                        })
-                                      }
-                                      className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:border-blue-500"
-                                    />
+                                    <p className="text-slate-200">
+                                      {delivery.rua}, {delivery.numero}
+                                      <br />
+                                      {delivery.bairro} - {delivery.cidade}
+                                    </p>
                                   </div>
 
                                   <div>
-                                    <label className="block text-sm font-medium text-slate-300 mb-1">
-                                      Bairro
-                                    </label>
-                                    <input
-                                      type="text"
-                                      defaultValue={delivery.bairro}
-                                      onChange={(e) =>
-                                        setEditingDelivery({
-                                          ...delivery,
-                                          bairro: e.target.value,
-                                        })
-                                      }
-                                      className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:border-blue-500"
-                                    />
-                                  </div>
-
-                                  <div>
-                                    <label className="block text-sm font-medium text-slate-300 mb-1">
-                                      Rua
-                                    </label>
-                                    <input
-                                      type="text"
-                                      defaultValue={delivery.rua}
-                                      onChange={(e) =>
-                                        setEditingDelivery({
-                                          ...delivery,
-                                          rua: e.target.value,
-                                        })
-                                      }
-                                      className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:border-blue-500"
-                                    />
-                                  </div>
-
-                                  <div>
-                                    <label className="block text-sm font-medium text-slate-300 mb-1">
-                                      Número
-                                    </label>
-                                    <input
-                                      type="text"
-                                      defaultValue={delivery.numero}
-                                      onChange={(e) =>
-                                        setEditingDelivery({
-                                          ...delivery,
-                                          numero: e.target.value,
-                                        })
-                                      }
-                                      className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:border-blue-500"
-                                    />
-                                  </div>
-
-                                  <div>
-                                    <label className="block text-sm font-medium text-slate-300 mb-1">
-                                      Valor
-                                    </label>
-                                    <input
-                                      type="text"
-                                      defaultValue={delivery.valor}
-                                      onChange={(e) =>
-                                        setEditingDelivery({
-                                          ...delivery,
-                                          valor: e.target.value,
-                                        })
-                                      }
-                                      className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:border-blue-500"
-                                    />
-                                  </div>
-
-                                  <div>
-                                    <label className="block text-sm font-medium text-slate-300 mb-1">
-                                      Forma de Pagamento
-                                    </label>
-                                    <select
-                                      defaultValue={delivery.pagamento}
-                                      onChange={(e) =>
-                                        setEditingDelivery({
-                                          ...delivery,
-                                          pagamento: e.target.value,
-                                        })
-                                      }
-                                      className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:border-blue-500"
-                                    >
-                                      <option value="PIX">PIX</option>
-                                      <option value="Dinheiro">Dinheiro</option>
-                                      <option value="Cartão">Cartão</option>
-                                    </select>
-                                  </div>
-
-                                  <div>
-                                    <label className="block text-sm font-medium text-slate-300 mb-1">
-                                      Entregador
-                                    </label>
-                                    <select
-                                      defaultValue={delivery.entregador}
-                                      onChange={(e) =>
-                                        setEditingDelivery({
-                                          ...delivery,
-                                          entregador: e.target.value,
-                                        })
-                                      }
-                                      className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:border-blue-500"
-                                    >
-                                      <option value="Marcos">Marcos</option>
-                                      <option value="Uene">Uene</option>
-                                      <option value="Leo">Leo</option>
-                                    </select>
-                                  </div>
-
-                                  <div>
-                                    <label className="block text-sm font-medium text-slate-300 mb-1">
+                                    <label className="text-xs text-slate-400">
                                       Volume
                                     </label>
-                                    <select
-                                      defaultValue={delivery.volume}
-                                      onChange={(e) =>
-                                        setEditingDelivery({
-                                          ...delivery,
-                                          volume: e.target.value,
-                                        })
-                                      }
-                                      className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:border-blue-500"
-                                    >
-                                      <option value="Pequeno">Pequeno</option>
-                                      <option value="Médio">Médio</option>
-                                      <option value="Grande">Grande</option>
-                                    </select>
+                                    <p className="text-slate-200">
+                                      {delivery.volume}
+                                    </p>
                                   </div>
 
-                                  <div className="col-span-2">
-                                    <label className="block text-sm font-medium text-slate-300 mb-1">
-                                      Observações
+                                  <div>
+                                    <label className="text-xs text-slate-400">
+                                      Data da Entrega
                                     </label>
-                                    <textarea
-                                      defaultValue={delivery.observacoes}
-                                      onChange={(e) =>
-                                        setEditingDelivery({
-                                          ...delivery,
-                                          observacoes: e.target.value,
-                                        })
-                                      }
-                                      className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:border-blue-500 resize-none h-24"
-                                    />
+                                    <p className="text-slate-200">
+                                      {delivery.dia.join("/")}
+                                    </p>
+                                  </div>
+
+                                  <div>
+                                    <label className="text-xs text-slate-400">
+                                      Entregador
+                                    </label>
+                                    <p className="text-slate-200">
+                                      {delivery.entregador}
+                                    </p>
+                                  </div>
+
+                                  <div>
+                                    <label className="text-xs text-slate-400">
+                                      Valor
+                                    </label>
+                                    <p className="text-slate-200">
+                                      R$ {delivery.valor}
+                                    </p>
+                                  </div>
+
+                                  <div>
+                                    <label className="text-xs text-slate-400">
+                                      Pagamento
+                                    </label>
+                                    <p className="text-slate-200">
+                                      {delivery.pagamento}
+                                    </p>
+                                  </div>
+
+                                  {delivery.observacoes && (
+                                    <div>
+                                      <label className="text-xs text-slate-400">
+                                        Observações
+                                      </label>
+                                      <p className="text-slate-200">
+                                        {delivery.observacoes}
+                                      </p>
+                                    </div>
+                                  )}
+                                </>
+                              ) : (
+                                // Formulário de Edição
+                                <div className="p-4">
+                                  <div className="flex justify-between items-center mb-6">
+                                    <h2 className="text-xl font-bold text-white">
+                                      Editar Entrega
+                                    </h2>
+                                    <button
+                                      onClick={() => setIsEditing(false)}
+                                      className="text-slate-400 hover:text-slate-200 transition-colors"
+                                    >
+                                      <XMarkIcon className="h-6 w-6" />
+                                    </button>
+                                  </div>
+
+                                  <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                      <label className="block text-sm font-medium text-slate-300 mb-1">
+                                        Nome do Cliente
+                                      </label>
+                                      <input
+                                        type="text"
+                                        defaultValue={delivery.nome}
+                                        onChange={(e) =>
+                                          setEditingDelivery({
+                                            ...delivery,
+                                            nome: e.target.value,
+                                          })
+                                        }
+                                        className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:border-blue-500"
+                                      />
+                                    </div>
+
+                                    <div>
+                                      <label className="block text-sm font-medium text-slate-300 mb-1">
+                                        Telefone
+                                      </label>
+                                      <input
+                                        type="text"
+                                        defaultValue={delivery.telefone}
+                                        onChange={(e) =>
+                                          setEditingDelivery({
+                                            ...delivery,
+                                            telefone: e.target.value,
+                                          })
+                                        }
+                                        className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:border-blue-500"
+                                      />
+                                    </div>
+
+                                    <div>
+                                      <label className="block text-sm font-medium text-slate-300 mb-1">
+                                        Cidade
+                                      </label>
+                                      <input
+                                        type="text"
+                                        defaultValue={delivery.cidade}
+                                        onChange={(e) =>
+                                          setEditingDelivery({
+                                            ...delivery,
+                                            cidade: e.target.value,
+                                          })
+                                        }
+                                        className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:border-blue-500"
+                                      />
+                                    </div>
+
+                                    <div>
+                                      <label className="block text-sm font-medium text-slate-300 mb-1">
+                                        Bairro
+                                      </label>
+                                      <input
+                                        type="text"
+                                        defaultValue={delivery.bairro}
+                                        onChange={(e) =>
+                                          setEditingDelivery({
+                                            ...delivery,
+                                            bairro: e.target.value,
+                                          })
+                                        }
+                                        className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:border-blue-500"
+                                      />
+                                    </div>
+
+                                    <div>
+                                      <label className="block text-sm font-medium text-slate-300 mb-1">
+                                        Rua
+                                      </label>
+                                      <input
+                                        type="text"
+                                        defaultValue={delivery.rua}
+                                        onChange={(e) =>
+                                          setEditingDelivery({
+                                            ...delivery,
+                                            rua: e.target.value,
+                                          })
+                                        }
+                                        className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:border-blue-500"
+                                      />
+                                    </div>
+
+                                    <div>
+                                      <label className="block text-sm font-medium text-slate-300 mb-1">
+                                        Número
+                                      </label>
+                                      <input
+                                        type="text"
+                                        defaultValue={delivery.numero}
+                                        onChange={(e) =>
+                                          setEditingDelivery({
+                                            ...delivery,
+                                            numero: e.target.value,
+                                          })
+                                        }
+                                        className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:border-blue-500"
+                                      />
+                                    </div>
+
+                                    <div>
+                                      <label className="block text-sm font-medium text-slate-300 mb-1">
+                                        Valor
+                                      </label>
+                                      <input
+                                        type="text"
+                                        defaultValue={delivery.valor}
+                                        onChange={(e) =>
+                                          setEditingDelivery({
+                                            ...delivery,
+                                            valor: e.target.value,
+                                          })
+                                        }
+                                        className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:border-blue-500"
+                                      />
+                                    </div>
+
+                                    <div>
+                                      <label className="block text-sm font-medium text-slate-300 mb-1">
+                                        Forma de Pagamento
+                                      </label>
+                                      <select
+                                        defaultValue={delivery.pagamento}
+                                        onChange={(e) =>
+                                          setEditingDelivery({
+                                            ...delivery,
+                                            pagamento: e.target.value,
+                                          })
+                                        }
+                                        className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:border-blue-500"
+                                      >
+                                        <option value="PIX">PIX</option>
+                                        <option value="Dinheiro">
+                                          Dinheiro
+                                        </option>
+                                        <option value="Cartão">Cartão</option>
+                                      </select>
+                                    </div>
+
+                                    <div>
+                                      <label className="block text-sm font-medium text-slate-300 mb-1">
+                                        Entregador
+                                      </label>
+                                      <select
+                                        defaultValue={delivery.entregador}
+                                        onChange={(e) =>
+                                          setEditingDelivery({
+                                            ...delivery,
+                                            entregador: e.target.value,
+                                          })
+                                        }
+                                        className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:border-blue-500"
+                                      >
+                                        <option value="Marcos">Marcos</option>
+                                        <option value="Uene">Uene</option>
+                                        <option value="Leo">Leo</option>
+                                      </select>
+                                    </div>
+
+                                    <div>
+                                      <label className="block text-sm font-medium text-slate-300 mb-1">
+                                        Volume
+                                      </label>
+                                      <select
+                                        defaultValue={delivery.volume}
+                                        onChange={(e) =>
+                                          setEditingDelivery({
+                                            ...delivery,
+                                            volume: e.target.value,
+                                          })
+                                        }
+                                        className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:border-blue-500"
+                                      >
+                                        <option value="Pequeno">Pequeno</option>
+                                        <option value="Médio">Médio</option>
+                                        <option value="Grande">Grande</option>
+                                      </select>
+                                    </div>
+
+                                    <div className="col-span-2">
+                                      <label className="block text-sm font-medium text-slate-300 mb-1">
+                                        Observações
+                                      </label>
+                                      <textarea
+                                        defaultValue={delivery.observacoes}
+                                        onChange={(e) =>
+                                          setEditingDelivery({
+                                            ...delivery,
+                                            observacoes: e.target.value,
+                                          })
+                                        }
+                                        className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-slate-200 focus:outline-none focus:border-blue-500 resize-none h-24"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  <div className="mt-6 flex justify-end space-x-3">
+                                    <button
+                                      onClick={() => setIsEditing(false)}
+                                      className="px-4 py-2 bg-slate-700 text-slate-200 rounded-lg hover:bg-slate-600 transition-colors"
+                                    >
+                                      Cancelar
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        if (socket && editingDelivery) {
+                                          socket.emit(
+                                            "Atualizar Entrega",
+                                            editingDelivery
+                                          );
+                                          setIsEditing(false);
+                                        }
+                                      }}
+                                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors"
+                                    >
+                                      Salvar Alterações
+                                    </button>
                                   </div>
                                 </div>
-
-                                <div className="mt-6 flex justify-end space-x-3">
-                                  <button
-                                    onClick={() => setIsEditing(false)}
-                                    className="px-4 py-2 bg-slate-700 text-slate-200 rounded-lg hover:bg-slate-600 transition-colors"
-                                  >
-                                    Cancelar
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      if (socket && editingDelivery) {
-                                        socket.emit(
-                                          "Atualizar Entrega",
-                                          editingDelivery
-                                        );
-                                        setIsEditing(false);
-                                      }
-                                    }}
-                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors"
-                                  >
-                                    Salvar Alterações
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
+                              )}
+                            </div>
+                          )}
                         </motion.div>
                       )}
                     </div>

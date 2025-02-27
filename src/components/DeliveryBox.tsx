@@ -237,8 +237,8 @@ export default function DeliveryBox({
                         </div>
                       </div>
 
-                      {/* Botões e Detalhes para Mobile */}
-                      {isMobile && selectedDelivery?.id === delivery.id && (
+                      {/* Botões e Detalhes para Mobile e Desktop */}
+                      {selectedDelivery?.id === delivery.id && (
                         <motion.div
                           initial={{ height: 0, opacity: 0 }}
                           animate={{ height: "auto", opacity: 1 }}
@@ -353,101 +353,103 @@ export default function DeliveryBox({
                           </div>
 
                           {/* Detalhes da Entrega */}
-                          <div className="p-4 space-y-4">
-                            {!isEditing ? (
-                              <>
-                                <div>
-                                  <label className="text-xs text-slate-400">
-                                    Cliente
-                                  </label>
-                                  <p className="text-slate-200">
-                                    {delivery.nome}
-                                  </p>
-                                </div>
-
-                                <div>
-                                  <label className="text-xs text-slate-400">
-                                    Telefone
-                                  </label>
-                                  <p className="text-slate-200">
-                                    {delivery.telefone}
-                                  </p>
-                                </div>
-
-                                <div>
-                                  <label className="text-xs text-slate-400">
-                                    Endereço
-                                  </label>
-                                  <p className="text-slate-200">
-                                    {delivery.rua}, {delivery.numero}
-                                    <br />
-                                    {delivery.bairro} - {delivery.cidade}
-                                  </p>
-                                </div>
-
-                                <div>
-                                  <label className="text-xs text-slate-400">
-                                    Volume
-                                  </label>
-                                  <p className="text-slate-200">
-                                    {delivery.volume}
-                                  </p>
-                                </div>
-
-                                <div>
-                                  <label className="text-xs text-slate-400">
-                                    Data da Entrega
-                                  </label>
-                                  <p className="text-slate-200">
-                                    {delivery.dia.join("/")}
-                                  </p>
-                                </div>
-
-                                <div>
-                                  <label className="text-xs text-slate-400">
-                                    Entregador
-                                  </label>
-                                  <p className="text-slate-200">
-                                    {delivery.entregador}
-                                  </p>
-                                </div>
-
-                                <div>
-                                  <label className="text-xs text-slate-400">
-                                    Valor
-                                  </label>
-                                  <p className="text-slate-200">
-                                    R$ {delivery.valor}
-                                  </p>
-                                </div>
-
-                                <div>
-                                  <label className="text-xs text-slate-400">
-                                    Pagamento
-                                  </label>
-                                  <p className="text-slate-200">
-                                    {delivery.pagamento}
-                                  </p>
-                                </div>
-
-                                {delivery.observacoes && (
+                          {isMobile && (
+                            <div className="p-4 space-y-4">
+                              {!isEditing ? (
+                                <>
                                   <div>
                                     <label className="text-xs text-slate-400">
-                                      Observações
+                                      Cliente
                                     </label>
                                     <p className="text-slate-200">
-                                      {delivery.observacoes}
+                                      {delivery.nome}
                                     </p>
                                   </div>
-                                )}
-                              </>
-                            ) : (
-                              // Formulário de Edição (mantenha o código existente do formulário)
-                              <div className="p-4">
-                                {/* Mantenha o código existente do formulário de edição aqui */}
-                              </div>
-                            )}
-                          </div>
+
+                                  <div>
+                                    <label className="text-xs text-slate-400">
+                                      Telefone
+                                    </label>
+                                    <p className="text-slate-200">
+                                      {delivery.telefone}
+                                    </p>
+                                  </div>
+
+                                  <div>
+                                    <label className="text-xs text-slate-400">
+                                      Endereço
+                                    </label>
+                                    <p className="text-slate-200">
+                                      {delivery.rua}, {delivery.numero}
+                                      <br />
+                                      {delivery.bairro} - {delivery.cidade}
+                                    </p>
+                                  </div>
+
+                                  <div>
+                                    <label className="text-xs text-slate-400">
+                                      Volume
+                                    </label>
+                                    <p className="text-slate-200">
+                                      {delivery.volume}
+                                    </p>
+                                  </div>
+
+                                  <div>
+                                    <label className="text-xs text-slate-400">
+                                      Data da Entrega
+                                    </label>
+                                    <p className="text-slate-200">
+                                      {delivery.dia.join("/")}
+                                    </p>
+                                  </div>
+
+                                  <div>
+                                    <label className="text-xs text-slate-400">
+                                      Entregador
+                                    </label>
+                                    <p className="text-slate-200">
+                                      {delivery.entregador}
+                                    </p>
+                                  </div>
+
+                                  <div>
+                                    <label className="text-xs text-slate-400">
+                                      Valor
+                                    </label>
+                                    <p className="text-slate-200">
+                                      R$ {delivery.valor}
+                                    </p>
+                                  </div>
+
+                                  <div>
+                                    <label className="text-xs text-slate-400">
+                                      Pagamento
+                                    </label>
+                                    <p className="text-slate-200">
+                                      {delivery.pagamento}
+                                    </p>
+                                  </div>
+
+                                  {delivery.observacoes && (
+                                    <div>
+                                      <label className="text-xs text-slate-400">
+                                        Observações
+                                      </label>
+                                      <p className="text-slate-200">
+                                        {delivery.observacoes}
+                                      </p>
+                                    </div>
+                                  )}
+                                </>
+                              ) : (
+                                // Formulário de Edição (mantenha o código existente do formulário)
+                                <div className="p-4">
+                                  {/* Mantenha o código existente do formulário de edição aqui */}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </motion.div>
                       )}
                     </div>

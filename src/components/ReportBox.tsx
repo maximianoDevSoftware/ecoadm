@@ -216,8 +216,9 @@ export default function ReportBox({
                                   : ""}
                               </p>
                             </div>
+                            {/* Versão Desktop */}
                             <div
-                              className="overflow-x-auto
+                              className="hidden md:block overflow-x-auto
                               [&::-webkit-scrollbar]:h-1.5
                               [&::-webkit-scrollbar-track]:bg-transparent
                               [&::-webkit-scrollbar-thumb]:bg-white/10
@@ -315,6 +316,103 @@ export default function ReportBox({
                                   ))}
                                 </tbody>
                               </table>
+                            </div>
+
+                            {/* Versão Mobile */}
+                            <div className="md:hidden">
+                              <div className="space-y-4 p-4">
+                                {filteredEntregas.map((entrega) => (
+                                  <div
+                                    key={entrega.id}
+                                    className="bg-slate-800/50 rounded-lg border border-white/10 p-4 space-y-3"
+                                  >
+                                    <div className="flex justify-between items-start">
+                                      <div>
+                                        <h3 className="font-medium text-slate-200">
+                                          {entrega.nome}
+                                        </h3>
+                                        <p className="text-sm text-slate-400">
+                                          {entrega.dia.join("/")}
+                                        </p>
+                                      </div>
+                                      <span
+                                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                          ${
+                                            entrega.status === "Disponível"
+                                              ? "bg-blue-400/10 text-blue-400"
+                                              : entrega.status === "Andamento"
+                                              ? "bg-amber-400/10 text-amber-400"
+                                              : "bg-emerald-400/10 text-emerald-400"
+                                          }`}
+                                      >
+                                        {entrega.status}
+                                      </span>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3 text-sm">
+                                      <div>
+                                        <p className="text-slate-400">Valor</p>
+                                        <p className="text-emerald-400">
+                                          R$ {entrega.valor}
+                                        </p>
+                                      </div>
+                                      <div>
+                                        <p className="text-slate-400">
+                                          Pagamento
+                                        </p>
+                                        <p className="text-slate-200">
+                                          {entrega.pagamento}
+                                        </p>
+                                      </div>
+                                      <div>
+                                        <p className="text-slate-400">
+                                          Entregador
+                                        </p>
+                                        <p className="text-slate-200">
+                                          {entrega.entregador}
+                                        </p>
+                                      </div>
+                                      <div>
+                                        <p className="text-slate-400">Volume</p>
+                                        <p className="text-slate-200">
+                                          {entrega.volume}
+                                        </p>
+                                      </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                      <div>
+                                        <p className="text-slate-400 text-sm">
+                                          Telefone
+                                        </p>
+                                        <p className="text-slate-200">
+                                          {entrega.telefone}
+                                        </p>
+                                      </div>
+                                      <div>
+                                        <p className="text-slate-400 text-sm">
+                                          Endereço
+                                        </p>
+                                        <p className="text-slate-200">
+                                          {entrega.rua}, {entrega.numero}
+                                          <br />
+                                          {entrega.bairro}, {entrega.cidade}
+                                        </p>
+                                      </div>
+                                      {entrega.observacoes && (
+                                        <div>
+                                          <p className="text-slate-400 text-sm">
+                                            Observações
+                                          </p>
+                                          <p className="text-slate-200">
+                                            {entrega.observacoes}
+                                          </p>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
                             </div>
                           </>
                         )}
