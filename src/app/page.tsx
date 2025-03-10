@@ -74,12 +74,9 @@ export default function Login() {
     if (socket) return;
 
     // Inicializa a conexão socket
-    const socketInstance = io(
-      "https://servidor-test-wts-efaaa800736e.herokuapp.com/",
-      {
-        transports: ["websocket"],
-      }
-    );
+    const socketInstance = io("https://web-production-0d584.up.railway.app/", {
+      transports: ["websocket"],
+    });
 
     if (isSubscribed) {
       setSocket(socketInstance);

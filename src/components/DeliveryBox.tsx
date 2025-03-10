@@ -16,6 +16,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { useEntregas } from "@/contexts/EntregasContext";
 import { entregasTipo } from "@/types/entregasTypes";
+import { clientesTipo } from "@/types/clientesType";
 import { io } from "socket.io-client";
 
 export default function DeliveryBox({
@@ -31,8 +32,11 @@ export default function DeliveryBox({
     null
   );
   const [isEditing, setIsEditing] = useState(false);
+  const [isEditingClient, setIsEditingClient] = useState(false);
   const { entregas, setEntregas } = useEntregas();
   const [editFormData, setEditFormData] = useState<entregasTipo | null>(null);
+  const [editClientFormData, setEditClientFormData] =
+    useState<clientesTipo | null>(null);
   const [socket, setSocket] = useState<any>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [messageButtonStates, setMessageButtonStates] = useState<{
@@ -40,9 +44,7 @@ export default function DeliveryBox({
   }>({});
 
   useEffect(() => {
-    const newSocket = io(
-      "https://servidor-test-wts-efaaa800736e.herokuapp.com/"
-    );
+    const newSocket = io("https://web-production-0d584.up.railway.app/");
     setSocket(newSocket);
 
     // Listener para o evento "Atualizando entregas"
@@ -51,6 +53,13 @@ export default function DeliveryBox({
       setIsSaving(false);
       setIsEditing(false);
       setEditFormData(null);
+    });
+
+    // Listener para o evento "Atualizando clientes"
+    newSocket.on("Atualizando clientes", () => {
+      setIsSaving(false);
+      setIsEditingClient(false);
+      setEditClientFormData(null);
     });
 
     return () => {
@@ -120,14 +129,59 @@ export default function DeliveryBox({
     // Atualiza o estado do botão para mostrar a animação
     setMessageButtonStates((prev) => ({
       ...prev,
-      [delivery.id || ""]: true,
+      [`cliente-${delivery.id || ""}`]: true,
     }));
 
     // Reseta o estado após 2 segundos
     setTimeout(() => {
       setMessageButtonStates((prev) => ({
         ...prev,
-        [delivery.id || ""]: false,
+        [`cliente-${delivery.id || ""}`]: false,
+      }));
+    }, 2000);
+  };
+
+  const handleInformEntregador = (delivery: entregasTipo) => {
+    if (!socket || !delivery.entregador) return;
+
+    // Define o contato baseado no entregador
+    let contato;
+    switch (delivery.entregador) {
+      case "Marcos":
+        contato = "554187280741";
+        break;
+      case "Uene":
+        contato = "554195762570";
+        break;
+      case "Leo":
+        contato = "554187280742";
+        break;
+      default:
+        console.log("Entregador não reconhecido");
+        return;
+    }
+    contato += "@c.us";
+
+    // Objeto da mensagem
+    const messageData = {
+      contato,
+      mensagem: `Você tem uma entrega disponível para ${delivery.nome}`,
+    };
+
+    // Emite o evento de mensagem
+    socket.emit("Enviar Mensagem", messageData);
+
+    // Atualiza o estado do botão para mostrar a animação
+    setMessageButtonStates((prev) => ({
+      ...prev,
+      [`entregador-${delivery.id || ""}`]: true,
+    }));
+
+    // Reseta o estado após 2 segundos
+    setTimeout(() => {
+      setMessageButtonStates((prev) => ({
+        ...prev,
+        [`entregador-${delivery.id || ""}`]: false,
       }));
     }, 2000);
   };
@@ -258,11 +312,31 @@ export default function DeliveryBox({
                                         dia: [...delivery.dia],
                                       });
                                       setIsEditing(true);
+                                      setIsEditingClient(false);
+                                    } else if (
+                                      button.label === "Editar Cliente"
+                                    ) {
+                                      setEditClientFormData({
+                                        nome: delivery.nome,
+                                        telefone: delivery.telefone || "",
+                                        cidade: delivery.cidade,
+                                        bairro: delivery.bairro,
+                                        rua: delivery.rua,
+                                        numero: delivery.numero,
+                                        coordenadas: delivery.coordenadas,
+                                      });
+                                      setIsEditingClient(true);
+                                      setIsEditing(false);
                                     } else if (
                                       button.label === "Informar Cliente" &&
                                       selectedDelivery
                                     ) {
                                       handleSendMessage(selectedDelivery);
+                                    } else if (
+                                      button.label === "Informar Entregador" &&
+                                      selectedDelivery
+                                    ) {
+                                      handleInformEntregador(selectedDelivery);
                                     }
                                   }}
                                   className={`relative group p-2 rounded-lg ${button.color} transition-all duration-200`}
@@ -270,7 +344,14 @@ export default function DeliveryBox({
                                   whileTap={{ scale: 0.95 }}
                                 >
                                   {button.label === "Informar Cliente" &&
-                                  messageButtonStates[delivery.id || ""] ? (
+                                  messageButtonStates[
+                                    `cliente-${delivery.id || ""}`
+                                  ] ? (
+                                    <CheckCircleIcon className="h-5 w-5 text-green-500" />
+                                  ) : button.label === "Informar Entregador" &&
+                                    messageButtonStates[
+                                      `entregador-${delivery.id || ""}`
+                                    ] ? (
                                     <CheckCircleIcon className="h-5 w-5 text-green-500" />
                                   ) : (
                                     <button.icon className="h-5 w-5" />
@@ -443,9 +524,250 @@ export default function DeliveryBox({
                                   )}
                                 </>
                               ) : (
-                                // Formulário de Edição (mantenha o código existente do formulário)
-                                <div className="p-4">
-                                  {/* Mantenha o código existente do formulário de edição aqui */}
+                                // Formulário de Edição
+                                <div
+                                  className="flex-1 overflow-y-auto pr-2 space-y-4
+                                  [&::-webkit-scrollbar]:w-1
+                                  [&::-webkit-scrollbar-track]:bg-transparent
+                                  [&::-webkit-scrollbar-thumb]:bg-white/5
+                                  [&::-webkit-scrollbar-thumb]:rounded-full
+                                  [&::-webkit-scrollbar-thumb]:hover:bg-white/10
+                                  hover:[&::-webkit-scrollbar]:w-1.5
+                                  transition-all duration-300"
+                                >
+                                  <div>
+                                    <label className="text-xs text-slate-400">
+                                      Cliente
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={editFormData?.nome || ""}
+                                      onChange={(e) =>
+                                        setEditFormData((prev) => ({
+                                          ...prev!,
+                                          nome: e.target.value,
+                                        }))
+                                      }
+                                      className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-slate-200 text-sm"
+                                    />
+                                  </div>
+
+                                  <div>
+                                    <label className="text-xs text-slate-400">
+                                      Telefone
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={editFormData?.telefone || ""}
+                                      onChange={(e) =>
+                                        setEditFormData((prev) => ({
+                                          ...prev!,
+                                          telefone: e.target.value,
+                                        }))
+                                      }
+                                      className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-slate-200 text-sm"
+                                    />
+                                  </div>
+
+                                  <div>
+                                    <label className="text-xs text-slate-400">
+                                      Endereço
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={editFormData?.rua || ""}
+                                      onChange={(e) =>
+                                        setEditFormData((prev) => ({
+                                          ...prev!,
+                                          rua: e.target.value,
+                                        }))
+                                      }
+                                      className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-slate-200 text-sm"
+                                      placeholder="Rua"
+                                    />
+                                    <input
+                                      type="text"
+                                      value={editFormData?.numero || ""}
+                                      onChange={(e) =>
+                                        setEditFormData((prev) => ({
+                                          ...prev!,
+                                          numero: e.target.value,
+                                        }))
+                                      }
+                                      className="w-full mt-2 bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-slate-200 text-sm"
+                                      placeholder="Número"
+                                    />
+                                    <input
+                                      type="text"
+                                      value={editFormData?.bairro || ""}
+                                      onChange={(e) =>
+                                        setEditFormData((prev) => ({
+                                          ...prev!,
+                                          bairro: e.target.value,
+                                        }))
+                                      }
+                                      className="w-full mt-2 bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-slate-200 text-sm"
+                                      placeholder="Bairro"
+                                    />
+                                  </div>
+
+                                  <div>
+                                    <label className="text-xs text-slate-400">
+                                      Volume
+                                    </label>
+                                    <select
+                                      value={editFormData?.volume || ""}
+                                      onChange={(e) =>
+                                        setEditFormData((prev) => ({
+                                          ...prev!,
+                                          volume: e.target.value,
+                                        }))
+                                      }
+                                      className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-slate-200 text-sm"
+                                    >
+                                      <option value="Pequeno">Pequeno</option>
+                                      <option value="Médio">Médio</option>
+                                      <option value="Grande">Grande</option>
+                                    </select>
+                                  </div>
+
+                                  <div>
+                                    <label className="text-xs text-slate-400">
+                                      Entregador
+                                    </label>
+                                    <select
+                                      value={editFormData?.entregador || ""}
+                                      onChange={(e) =>
+                                        setEditFormData((prev) => ({
+                                          ...prev!,
+                                          entregador: e.target.value,
+                                        }))
+                                      }
+                                      className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-slate-200 text-sm"
+                                    >
+                                      {availableUsers.map((user) => (
+                                        <option
+                                          key={user.value}
+                                          value={user.value}
+                                        >
+                                          {user.name}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+
+                                  <div>
+                                    <label className="text-xs text-slate-400">
+                                      Valor
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={editFormData?.valor || ""}
+                                      onChange={(e) =>
+                                        setEditFormData((prev) => ({
+                                          ...prev!,
+                                          valor: e.target.value,
+                                        }))
+                                      }
+                                      className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-slate-200 text-sm"
+                                    />
+                                  </div>
+
+                                  <div>
+                                    <label className="text-xs text-slate-400">
+                                      Pagamento
+                                    </label>
+                                    <select
+                                      value={editFormData?.pagamento || ""}
+                                      onChange={(e) =>
+                                        setEditFormData((prev) => ({
+                                          ...prev!,
+                                          pagamento: e.target.value,
+                                        }))
+                                      }
+                                      className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-slate-200 text-sm"
+                                    >
+                                      <option value="PIX">PIX</option>
+                                      <option value="Dinheiro">Dinheiro</option>
+                                      <option value="Cartão">Cartão</option>
+                                    </select>
+                                  </div>
+
+                                  <div>
+                                    <label className="text-xs text-slate-400">
+                                      Observações
+                                    </label>
+                                    <textarea
+                                      value={editFormData?.observacoes || ""}
+                                      onChange={(e) =>
+                                        setEditFormData((prev) => ({
+                                          ...prev!,
+                                          observacoes: e.target.value,
+                                        }))
+                                      }
+                                      className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-slate-200 text-sm"
+                                      rows={3}
+                                    />
+                                  </div>
+
+                                  <div>
+                                    <label className="text-xs text-slate-400">
+                                      Coordenadas
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={`${
+                                        editFormData?.coordenadas?.latitude ||
+                                        ""
+                                      }, ${
+                                        editFormData?.coordenadas?.longitude ||
+                                        ""
+                                      }`}
+                                      onChange={(e) => {
+                                        const [lat, lng] = e.target.value
+                                          .split(",")
+                                          .map((v) => v.trim());
+                                        setEditFormData((prev) => ({
+                                          ...prev!,
+                                          coordenadas: {
+                                            latitude: parseFloat(lat) || 0,
+                                            longitude: parseFloat(lng) || 0,
+                                          },
+                                        }));
+                                      }}
+                                      placeholder="-25.838523944195668, -48.53857383068678"
+                                      className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-slate-200 text-sm font-mono"
+                                    />
+                                  </div>
+
+                                  <div className="flex gap-2 pt-4">
+                                    <button
+                                      onClick={() => {
+                                        if (socket && editFormData) {
+                                          setIsSaving(true);
+                                          socket.emit(
+                                            "Atualizar Entrega",
+                                            editFormData
+                                          );
+                                        }
+                                      }}
+                                      disabled={isSaving}
+                                      className="flex-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 
+                                        rounded-lg py-2 font-medium transition-colors"
+                                    >
+                                      {isSaving ? "Salvando..." : "Salvar"}
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setIsEditing(false);
+                                        setEditFormData(null);
+                                      }}
+                                      className="flex-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 
+                                        rounded-lg py-2 font-medium transition-colors"
+                                    >
+                                      Cancelar
+                                    </button>
+                                  </div>
                                 </div>
                               )}
                             </div>
@@ -464,12 +786,25 @@ export default function DeliveryBox({
                 {selectedDelivery ? (
                   <>
                     <h3 className="text-lg font-semibold text-slate-200 mb-6">
-                      {isEditing ? "Editar Entrega" : "Detalhes da Entrega"}
+                      {isEditing
+                        ? "Editar Entrega"
+                        : isEditingClient
+                        ? "Editar Cliente"
+                        : "Detalhes da Entrega"}
                     </h3>
 
                     {isEditing ? (
                       // Formulário de Edição
-                      <div className="flex-1 overflow-y-auto pr-2 space-y-4">
+                      <div
+                        className="flex-1 overflow-y-auto pr-2 space-y-4
+                        [&::-webkit-scrollbar]:w-1
+                        [&::-webkit-scrollbar-track]:bg-transparent
+                        [&::-webkit-scrollbar-thumb]:bg-white/5
+                        [&::-webkit-scrollbar-thumb]:rounded-full
+                        [&::-webkit-scrollbar-thumb]:hover:bg-white/10
+                        hover:[&::-webkit-scrollbar]:w-1.5
+                        transition-all duration-300"
+                      >
                         <div>
                           <label className="text-xs text-slate-400">
                             Cliente
@@ -642,6 +977,32 @@ export default function DeliveryBox({
                           />
                         </div>
 
+                        <div>
+                          <label className="text-xs text-slate-400">
+                            Coordenadas
+                          </label>
+                          <input
+                            type="text"
+                            value={`${
+                              editFormData?.coordenadas?.latitude || ""
+                            }, ${editFormData?.coordenadas?.longitude || ""}`}
+                            onChange={(e) => {
+                              const [lat, lng] = e.target.value
+                                .split(",")
+                                .map((v) => v.trim());
+                              setEditFormData((prev) => ({
+                                ...prev!,
+                                coordenadas: {
+                                  latitude: parseFloat(lat) || 0,
+                                  longitude: parseFloat(lng) || 0,
+                                },
+                              }));
+                            }}
+                            placeholder="-25.838523944195668, -48.53857383068678"
+                            className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-slate-200 text-sm font-mono"
+                          />
+                        </div>
+
                         <div className="flex gap-2 pt-4">
                           <button
                             onClick={() => {
@@ -660,6 +1021,175 @@ export default function DeliveryBox({
                             onClick={() => {
                               setIsEditing(false);
                               setEditFormData(null);
+                            }}
+                            className="flex-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 
+                              rounded-lg py-2 font-medium transition-colors"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    ) : isEditingClient ? (
+                      // Formulário de Edição de Cliente
+                      <div
+                        className="flex-1 overflow-y-auto pr-2 space-y-4
+                        [&::-webkit-scrollbar]:w-1
+                        [&::-webkit-scrollbar-track]:bg-transparent
+                        [&::-webkit-scrollbar-thumb]:bg-white/5
+                        [&::-webkit-scrollbar-thumb]:rounded-full
+                        [&::-webkit-scrollbar-thumb]:hover:bg-white/10
+                        hover:[&::-webkit-scrollbar]:w-1.5
+                        transition-all duration-300"
+                      >
+                        <div>
+                          <label className="text-xs text-slate-400">Nome</label>
+                          <input
+                            type="text"
+                            value={editClientFormData?.nome || ""}
+                            onChange={(e) =>
+                              setEditClientFormData((prev) => ({
+                                ...prev!,
+                                nome: e.target.value,
+                              }))
+                            }
+                            className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-slate-200 text-sm"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-slate-400">
+                            Telefone
+                          </label>
+                          <input
+                            type="text"
+                            value={editClientFormData?.telefone || ""}
+                            onChange={(e) =>
+                              setEditClientFormData((prev) => ({
+                                ...prev!,
+                                telefone: e.target.value,
+                              }))
+                            }
+                            className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-slate-200 text-sm"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-slate-400">
+                            Cidade
+                          </label>
+                          <input
+                            type="text"
+                            value={editClientFormData?.cidade || ""}
+                            onChange={(e) =>
+                              setEditClientFormData((prev) => ({
+                                ...prev!,
+                                cidade: e.target.value,
+                              }))
+                            }
+                            className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-slate-200 text-sm"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-slate-400">
+                            Bairro
+                          </label>
+                          <input
+                            type="text"
+                            value={editClientFormData?.bairro || ""}
+                            onChange={(e) =>
+                              setEditClientFormData((prev) => ({
+                                ...prev!,
+                                bairro: e.target.value,
+                              }))
+                            }
+                            className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-slate-200 text-sm"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-slate-400">Rua</label>
+                          <input
+                            type="text"
+                            value={editClientFormData?.rua || ""}
+                            onChange={(e) =>
+                              setEditClientFormData((prev) => ({
+                                ...prev!,
+                                rua: e.target.value,
+                              }))
+                            }
+                            className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-slate-200 text-sm"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-slate-400">
+                            Número
+                          </label>
+                          <input
+                            type="text"
+                            value={editClientFormData?.numero || ""}
+                            onChange={(e) =>
+                              setEditClientFormData((prev) => ({
+                                ...prev!,
+                                numero: e.target.value,
+                              }))
+                            }
+                            className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-slate-200 text-sm"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-slate-400">
+                            Coordenadas
+                          </label>
+                          <input
+                            type="text"
+                            value={`${
+                              editClientFormData?.coordenadas?.latitude || ""
+                            }, ${
+                              editClientFormData?.coordenadas?.longitude || ""
+                            }`}
+                            onChange={(e) => {
+                              const [lat, lng] = e.target.value
+                                .split(",")
+                                .map((v) => v.trim());
+                              setEditClientFormData((prev) => ({
+                                ...prev!,
+                                coordenadas: {
+                                  latitude: parseFloat(lat) || 0,
+                                  longitude: parseFloat(lng) || 0,
+                                },
+                              }));
+                            }}
+                            placeholder="-25.838523944195668, -48.53857383068678"
+                            className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-slate-200 text-sm font-mono"
+                          />
+                        </div>
+
+                        <div className="flex gap-2 pt-4">
+                          <button
+                            onClick={() => {
+                              if (socket && editClientFormData) {
+                                setIsSaving(true);
+                                socket.emit(
+                                  "Atualizar Cliente",
+                                  editClientFormData
+                                );
+                                setIsEditingClient(false);
+                                setEditClientFormData(null);
+                              }
+                            }}
+                            disabled={isSaving}
+                            className="flex-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 
+                              rounded-lg py-2 font-medium transition-colors"
+                          >
+                            {isSaving ? "Salvando..." : "Salvar"}
+                          </button>
+                          <button
+                            onClick={() => {
+                              setIsEditingClient(false);
+                              setEditClientFormData(null);
                             }}
                             className="flex-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 
                               rounded-lg py-2 font-medium transition-colors"

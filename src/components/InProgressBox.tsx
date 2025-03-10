@@ -67,9 +67,7 @@ export default function InProgressBox({
   );
 
   useEffect(() => {
-    const newSocket = io(
-      "https://servidor-test-wts-efaaa800736e.herokuapp.com/"
-    );
+    const newSocket = io("https://web-production-0d584.up.railway.app/");
     setSocket(newSocket);
 
     return () => {

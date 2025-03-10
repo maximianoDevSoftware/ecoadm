@@ -136,7 +136,7 @@ const getUserInitialColor = (userName: string) => {
     case "Marcos":
       return "bg-blue-500";
     case "Uene":
-      return "bg-purple-500";
+      return "bg-red-500";
     case "Leo":
       return "bg-emerald-500";
     default:
@@ -191,6 +191,24 @@ const CustomPopupContent = ({
     "details" | "editing" | "removing"
   >("details");
   const [isDeleting, setIsDeleting] = useState(false);
+  const [selectedEntregador, setSelectedEntregador] = useState(
+    entrega.entregador
+  );
+  const [isSaving, setIsSaving] = useState(false);
+
+  const availableUsers = [
+    { name: "Marcos Roberto", value: "Marcos" },
+    { name: "Uene Passos", value: "Uene" },
+    { name: "Leo Henrique", value: "Leo" },
+  ];
+
+  useEffect(() => {
+    if (socket) {
+      socket.on("Atualizando entregas", () => {
+        setIsSaving(false);
+      });
+    }
+  }, [socket]);
 
   const handleDelete = () => {
     setIsDeleting(true);
@@ -325,18 +343,40 @@ const CustomPopupContent = ({
               <div className="flex items-start gap-3">
                 <div
                   className={`p-2 rounded-lg ${getUserInitialColor(
-                    entrega.entregador
+                    selectedEntregador
                   )}`}
                 >
                   <span className="text-white font-medium">
-                    {entrega.entregador[0]}
+                    {selectedEntregador[0]}
                   </span>
                 </div>
-                <div>
+                <div className="flex-1">
                   <h3 className="font-medium text-white">Entregador</h3>
-                  <span className="text-sm text-white/80">
-                    {entrega.entregador}
-                  </span>
+                  <div className="mt-1">
+                    <select
+                      value={selectedEntregador}
+                      onChange={(e) => {
+                        setSelectedEntregador(e.target.value);
+                        setIsSaving(true);
+                        socket.emit("Atualizar Entrega", {
+                          ...entrega,
+                          entregador: e.target.value,
+                        });
+                      }}
+                      className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-2 py-1 text-sm text-white/80 focus:outline-none focus:border-blue-500/50 transition-colors"
+                    >
+                      {availableUsers.map((user) => (
+                        <option key={user.value} value={user.value}>
+                          {user.name}
+                        </option>
+                      ))}
+                    </select>
+                    {isSaving && (
+                      <div className="absolute right-2 top-2">
+                        <div className="w-4 h-4 border-2 border-blue-500/50 border-t-transparent rounded-full animate-spin" />
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -468,6 +508,14 @@ const DraggableMarker = ({
   const markerRef = useRef<L.Marker | null>(null);
   const map = useMap();
   const { entregas, setEntregas } = useEntregas();
+
+  // Adicionando useEffect para atualizar a posição quando as coordenadas mudarem
+  useEffect(() => {
+    setMarkerPosition([
+      entrega.coordenadas.latitude,
+      entrega.coordenadas.longitude,
+    ]);
+  }, [entrega.coordenadas]);
 
   const eventHandlers = {
     dragstart() {
@@ -672,8 +720,8 @@ const DeliveryRoutes = ({
       const routeColor =
         color === "blue-500"
           ? "#3B82F6"
-          : color === "purple-500"
-          ? "#8B5CF6"
+          : color === "red-500"
+          ? "#EF4444"
           : "#10B981";
 
       try {
@@ -720,12 +768,12 @@ const DeliveryRoutes = ({
               filter: drop-shadow(0 0 6px #3B82F6);
             }
             .delivery-route-uene {
-              filter: drop-shadow(0 0 1px #8B5CF6);
+              filter: drop-shadow(0 0 1px #EF4444);
             }
             .delivery-route-uene:hover {
               opacity: 1 !important;
               stroke-width: 8px;
-              filter: drop-shadow(0 0 6px #8B5CF6);
+              filter: drop-shadow(0 0 6px #EF4444);
             }
             .delivery-route-leo {
               filter: drop-shadow(0 0 1px #10B981);
@@ -792,9 +840,7 @@ export default function Map() {
   );
 
   useEffect(() => {
-    const newSocket = io(
-      "https://servidor-test-wts-efaaa800736e.herokuapp.com/"
-    );
+    const newSocket = io("https://web-production-0d584.up.railway.app/");
     setSocket(newSocket);
 
     // Listener para atualizações de usuários

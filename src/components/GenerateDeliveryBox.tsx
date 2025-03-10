@@ -197,7 +197,7 @@ export default function GenerateDeliveryBox({
     if (!socket) {
       // Inicializa a conexão socket
       const socketInstance = io(
-        "https://servidor-test-wts-efaaa800736e.herokuapp.com/",
+        "https://web-production-0d584.up.railway.app/",
         {
           transports: ["websocket"],
         }
