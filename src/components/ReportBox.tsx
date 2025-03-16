@@ -8,10 +8,14 @@ import {
   CalendarIcon,
   ChartBarIcon,
   FolderIcon,
+  PencilSquareIcon,
+  CheckIcon,
+  XMarkIcon as XIcon,
 } from "@heroicons/react/24/outline";
 import { io } from "socket.io-client";
 import { entregasTipo } from "@/types/entregasTypes";
 import { useEntregas } from "@/contexts/EntregasContext";
+import TableReport from "./reports/TableReport";
 
 interface ReportBoxProps {
   isOpen: boolean;
@@ -21,6 +25,13 @@ interface ReportBoxProps {
 
 type TabType = "table" | "period" | "charts" | "files";
 
+// Interface para célula em edição
+interface EditingCell {
+  id: string;
+  field: keyof entregasTipo;
+  value: string;
+}
+
 export default function ReportBox({
   isOpen,
   onClose,
@@ -29,7 +40,9 @@ export default function ReportBox({
   const [activeTab, setActiveTab] = useState<TabType>("table");
   const [socket, setSocket] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const { entregas } = useEntregas(); // Usando o contexto de entregas existente
+  const { entregas } = useEntregas();
+  const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Estados para os filtros
   const [filters, setFilters] = useState({
@@ -115,6 +128,159 @@ export default function ReportBox({
     );
   });
 
+  // Função para renderizar célula editável
+  const EditableCell = ({
+    entrega,
+    field,
+    value,
+    isEditing,
+    canEdit = true,
+  }: {
+    entrega: entregasTipo;
+    field: keyof entregasTipo;
+    value: string;
+    isEditing: boolean;
+    canEdit?: boolean;
+  }) => {
+    const isCurrentlyEditing =
+      editingCell?.id === entrega.id && editingCell?.field === field;
+
+    const updateEntregaField = (
+      entrega: entregasTipo,
+      field: keyof entregasTipo,
+      value: string
+    ) => {
+      const updatedEntrega = { ...entrega };
+
+      if (field === "dia") {
+        const [year, month, day] = value.split("-").map(Number);
+        updatedEntrega.dia = [day, month, year];
+      } else if (field === "coordenadas") {
+        // Mantém as coordenadas inalteradas
+        updatedEntrega.coordenadas = entrega.coordenadas;
+      } else {
+        // Atualiza campos simples de string
+        (updatedEntrega as any)[field] = value;
+      }
+
+      return updatedEntrega;
+    };
+
+    if (!isCurrentlyEditing) {
+      return (
+        <div className="relative group flex items-center gap-2 w-full">
+          <span className="text-slate-300 truncate">{value}</span>
+          {(canEdit || field === "dia") && (
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => {
+                if (entrega.id) {
+                  if (field === "dia") {
+                    const [day, month, year] = entrega.dia;
+                    const formattedDate = `${year}-${String(month).padStart(
+                      2,
+                      "0"
+                    )}-${String(day).padStart(2, "0")}`;
+                    setEditingCell({
+                      id: entrega.id,
+                      field,
+                      value: formattedDate,
+                    });
+                  } else {
+                    setEditingCell({
+                      id: entrega.id,
+                      field,
+                      value: value.toString(),
+                    });
+                  }
+                }
+              }}
+              className="opacity-0 group-hover:opacity-100 transition-all duration-200
+                p-1.5 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 
+                text-blue-400 hover:text-blue-300 border border-blue-500/20
+                hover:border-blue-500/30 shadow-lg shadow-blue-500/10
+                backdrop-blur-sm flex-shrink-0"
+            >
+              <PencilSquareIcon className="h-3.5 w-3.5" />
+            </motion.button>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <motion.div
+        initial={{ scale: 0.95 }}
+        animate={{ scale: 1 }}
+        className="flex items-center gap-1"
+      >
+        {field === "dia" ? (
+          <input
+            type="date"
+            value={editingCell?.value || ""}
+            onChange={(e) => {
+              if (editingCell) {
+                setEditingCell({
+                  ...editingCell,
+                  value: e.target.value,
+                });
+              }
+            }}
+            className="w-full bg-slate-800/50 border border-blue-500/30 rounded-lg px-2 py-0.5
+              text-sm text-slate-200 focus:outline-none focus:border-blue-500"
+            autoFocus
+          />
+        ) : (
+          <input
+            type="text"
+            value={editingCell?.value || ""}
+            onChange={(e) => {
+              if (editingCell) {
+                setEditingCell({
+                  ...editingCell,
+                  value: e.target.value,
+                });
+              }
+            }}
+            className="w-full bg-slate-800/50 border border-blue-500/30 rounded-lg px-2 py-0.5
+              text-sm text-slate-200 focus:outline-none focus:border-blue-500"
+            autoFocus
+          />
+        )}
+        <div className="flex gap-1 flex-shrink-0">
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={async () => {
+              if (!socket || !editingCell) return;
+              setIsSaving(true);
+
+              const updatedEntrega = updateEntregaField(
+                entrega,
+                field,
+                editingCell.value
+              );
+              socket.emit("Atualizar Entrega", updatedEntrega);
+              setEditingCell(null);
+            }}
+            className="p-1 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+          >
+            <CheckIcon className="h-3.5 w-3.5" />
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setEditingCell(null)}
+            className="p-1 rounded-lg bg-rose-500/10 text-rose-400 hover:bg-rose-500/20"
+          >
+            <XIcon className="h-3.5 w-3.5" />
+          </motion.button>
+        </div>
+      </motion.div>
+    );
+  };
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -193,228 +359,11 @@ export default function ReportBox({
                 >
                   {activeTab === "table" && (
                     <div className="text-slate-200">
-                      <div className="rounded-lg border border-white/10 overflow-hidden">
-                        {isLoading ? (
-                          <div className="flex items-center justify-center p-8">
-                            <div className="flex flex-col items-center gap-4">
-                              <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                              <p className="text-slate-400">
-                                Carregando relatório...
-                              </p>
-                            </div>
-                          </div>
-                        ) : (
-                          <>
-                            <div className="p-4 border-b border-white/10 flex justify-between items-center">
-                              <p className="text-sm text-slate-400">
-                                Exibindo as {filteredEntregas.length} entregas
-                                mais recentes
-                                {filteredEntregas.length === 100
-                                  ? " (limitado a 100)"
-                                  : ""}
-                              </p>
-                            </div>
-                            {/* Versão Desktop */}
-                            <div
-                              className="hidden md:block overflow-x-auto
-                              [&::-webkit-scrollbar]:h-1.5
-                              [&::-webkit-scrollbar-track]:bg-transparent
-                              [&::-webkit-scrollbar-thumb]:bg-white/10
-                              [&::-webkit-scrollbar-thumb]:rounded-full
-                              [&::-webkit-scrollbar-thumb]:hover:bg-white/20
-                              hover:[&::-webkit-scrollbar]:h-2
-                              transition-all duration-300
-                              pb-2"
-                            >
-                              <table className="w-full min-w-[1200px]">
-                                <thead>
-                                  <tr className="bg-slate-800/50">
-                                    <th className="sticky left-0 bg-slate-800/50 px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
-                                      Nome
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
-                                      Status
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
-                                      Data
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
-                                      Valor
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
-                                      Pagamento
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
-                                      Entregador
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
-                                      Telefone
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
-                                      Endereço
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
-                                      Volume
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
-                                      Observações
-                                    </th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-white/5">
-                                  {filteredEntregas.map((entrega) => (
-                                    <tr
-                                      key={entrega.id}
-                                      className="hover:bg-slate-800/50 transition-colors"
-                                    >
-                                      <td className="sticky left-0 bg-slate-900/90 backdrop-blur-sm px-6 py-4 whitespace-nowrap text-sm">
-                                        {entrega.nome}
-                                      </td>
-                                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                        <span
-                                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                            ${
-                                              entrega.status === "Disponível"
-                                                ? "bg-blue-400/10 text-blue-400"
-                                                : entrega.status === "Andamento"
-                                                ? "bg-amber-400/10 text-amber-400"
-                                                : "bg-emerald-400/10 text-emerald-400"
-                                            }`}
-                                        >
-                                          {entrega.status}
-                                        </span>
-                                      </td>
-                                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
-                                        {entrega.dia.join("/")}
-                                      </td>
-                                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                        <span className="text-emerald-400">
-                                          R$ {entrega.valor}
-                                        </span>
-                                      </td>
-                                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
-                                        {entrega.pagamento}
-                                      </td>
-                                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
-                                        {entrega.entregador}
-                                      </td>
-                                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
-                                        {entrega.telefone}
-                                      </td>
-                                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
-                                        {`${entrega.rua}, ${entrega.numero} - ${entrega.bairro}, ${entrega.cidade}`}
-                                      </td>
-                                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
-                                        {entrega.volume}
-                                      </td>
-                                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
-                                        {entrega.observacoes || "-"}
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-
-                            {/* Versão Mobile */}
-                            <div className="md:hidden">
-                              <div className="space-y-4 p-4">
-                                {filteredEntregas.map((entrega) => (
-                                  <div
-                                    key={entrega.id}
-                                    className="bg-slate-800/50 rounded-lg border border-white/10 p-4 space-y-3"
-                                  >
-                                    <div className="flex justify-between items-start">
-                                      <div>
-                                        <h3 className="font-medium text-slate-200">
-                                          {entrega.nome}
-                                        </h3>
-                                        <p className="text-sm text-slate-400">
-                                          {entrega.dia.join("/")}
-                                        </p>
-                                      </div>
-                                      <span
-                                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                          ${
-                                            entrega.status === "Disponível"
-                                              ? "bg-blue-400/10 text-blue-400"
-                                              : entrega.status === "Andamento"
-                                              ? "bg-amber-400/10 text-amber-400"
-                                              : "bg-emerald-400/10 text-emerald-400"
-                                          }`}
-                                      >
-                                        {entrega.status}
-                                      </span>
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-3 text-sm">
-                                      <div>
-                                        <p className="text-slate-400">Valor</p>
-                                        <p className="text-emerald-400">
-                                          R$ {entrega.valor}
-                                        </p>
-                                      </div>
-                                      <div>
-                                        <p className="text-slate-400">
-                                          Pagamento
-                                        </p>
-                                        <p className="text-slate-200">
-                                          {entrega.pagamento}
-                                        </p>
-                                      </div>
-                                      <div>
-                                        <p className="text-slate-400">
-                                          Entregador
-                                        </p>
-                                        <p className="text-slate-200">
-                                          {entrega.entregador}
-                                        </p>
-                                      </div>
-                                      <div>
-                                        <p className="text-slate-400">Volume</p>
-                                        <p className="text-slate-200">
-                                          {entrega.volume}
-                                        </p>
-                                      </div>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                      <div>
-                                        <p className="text-slate-400 text-sm">
-                                          Telefone
-                                        </p>
-                                        <p className="text-slate-200">
-                                          {entrega.telefone}
-                                        </p>
-                                      </div>
-                                      <div>
-                                        <p className="text-slate-400 text-sm">
-                                          Endereço
-                                        </p>
-                                        <p className="text-slate-200">
-                                          {entrega.rua}, {entrega.numero}
-                                          <br />
-                                          {entrega.bairro}, {entrega.cidade}
-                                        </p>
-                                      </div>
-                                      {entrega.observacoes && (
-                                        <div>
-                                          <p className="text-slate-400 text-sm">
-                                            Observações
-                                          </p>
-                                          <p className="text-slate-200">
-                                            {entrega.observacoes}
-                                          </p>
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          </>
-                        )}
-                      </div>
+                      <TableReport
+                        entregas={filteredEntregas}
+                        socket={socket}
+                        isLoading={isLoading}
+                      />
                     </div>
                   )}
 

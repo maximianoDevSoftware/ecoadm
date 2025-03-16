@@ -12,6 +12,7 @@ import {
   ClipboardDocumentIcon,
   CheckCircleIcon,
   GlobeAltIcon,
+  PencilSquareIcon,
 } from "@heroicons/react/24/outline";
 import { entregasTipo } from "@/types/entregasTypes";
 import { mockClientes } from "@/mocks/clientes";
@@ -485,9 +486,21 @@ export default function GenerateDeliveryBox({
 
                           {/* Endereço (Detalhes do Cliente) */}
                           <div className="space-y-4">
-                            <h3 className="text-sm font-medium text-slate-300 flex items-center gap-2">
-                              <MapPinIcon className="h-4 w-4" />
-                              Detalhes do Cliente
+                            <h3 className="text-sm font-medium text-slate-300 flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <MapPinIcon className="h-4 w-4" />
+                                Detalhes do Cliente
+                              </div>
+                              {selectedClient && (
+                                <motion.button
+                                  whileHover={{ scale: 1.05 }}
+                                  whileTap={{ scale: 0.95 }}
+                                  className="p-1.5 rounded-lg bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 
+                                    transition-colors border border-purple-500/20 hover:border-purple-500/30 group"
+                                >
+                                  <PencilSquareIcon className="h-4 w-4 transition-transform group-hover:rotate-12" />
+                                </motion.button>
+                              )}
                             </h3>
 
                             {selectedClient ? (
