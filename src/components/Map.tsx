@@ -17,6 +17,7 @@ import {
   ChatBubbleBottomCenterTextIcon,
   ArrowsPointingOutIcon,
   TrashIcon,
+  GlobeAltIcon,
 } from "@heroicons/react/24/outline";
 import { io } from "socket.io-client";
 import { useUsers } from "@/contexts/UsersContext";
@@ -25,6 +26,43 @@ import "leaflet-routing-machine/dist/leaflet-routing-machine.css";
 import { useEntregas } from "@/contexts/EntregasContext";
 import { entregasTipo } from "@/types/entregasTypes";
 import { usuarioTipo } from "@/types/userTypes";
+
+// Função para buscar coordenadas
+async function getCoordinates(address: {
+  rua: string;
+  numero: string;
+  bairro: string;
+  cidade: string;
+}) {
+  const query = encodeURIComponent(
+    `${address.rua}, ${address.numero} - ${address.bairro}, ${address.cidade}, PR, Brasil`
+  );
+
+  try {
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${query}&limit=1`,
+      {
+        headers: {
+          Accept: "application/json",
+          "User-Agent": "Aplicativo-ADM/1.0",
+        },
+      }
+    );
+
+    const data = await response.json();
+
+    if (data && data.length > 0) {
+      return {
+        latitude: parseFloat(data[0].lat),
+        longitude: parseFloat(data[0].lon),
+      };
+    }
+    throw new Error("Endereço não encontrado");
+  } catch (error) {
+    console.error("Erro ao buscar coordenadas:", error);
+    throw error;
+  }
+}
 
 // Estendendo a interface do RoutingControlOptions
 declare module "leaflet-routing-machine" {
@@ -313,21 +351,80 @@ const CustomPopupContent = ({
                 <ArrowsPointingOutIcon className="w-8 h-8 text-white animate-pulse" />
               </div>
             </div>
-            <h3 className="text-white font-medium mb-2">
-              Alterando posição do Marcador
-            </h3>
-            <p className="text-white/60 text-sm mb-4">
-              Arraste o marcador para a nova posição
-            </p>
-            <button
-              onClick={() => {
-                setCurrentView("details");
-                onFinishEdit();
-              }}
-              className="bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium py-2 px-4 rounded-lg transition-all transform hover:scale-105"
-            >
-              Posicionar
-            </button>
+
+            <div className="space-y-4">
+              <button
+                type="button"
+                onClick={async () => {
+                  if (
+                    !entrega.rua ||
+                    !entrega.numero ||
+                    !entrega.bairro ||
+                    !entrega.cidade
+                  ) {
+                    alert("Endereço incompleto para gerar localização");
+                    return;
+                  }
+
+                  try {
+                    const coordinates = await getCoordinates({
+                      rua: entrega.rua,
+                      numero: entrega.numero,
+                      bairro: entrega.bairro,
+                      cidade: entrega.cidade,
+                    });
+
+                    // Atualiza a entrega com as novas coordenadas
+                    socket.emit("Atualizar Entrega", {
+                      ...entrega,
+                      coordenadas: coordinates,
+                    });
+                  } catch (error) {
+                    alert("Não foi possível encontrar as coordenadas para este endereço");
+                  }
+                }}
+                className="w-full px-4 py-3 bg-blue-600/20 hover:bg-blue-600/30 
+                  text-blue-400 rounded-lg transition-all flex items-center justify-center gap-2
+                  disabled:opacity-50 disabled:cursor-not-allowed border border-blue-500/20 hover:border-blue-500/30"
+              >
+                <GlobeAltIcon className="h-5 w-5" />
+                Gerar Localização Online
+              </button>
+
+              <div>
+                <input
+                  type="text"
+                  value={`${entrega.coordenadas.latitude}, ${entrega.coordenadas.longitude}`}
+                  onChange={(e) => {
+                    const [lat, lng] = e.target.value.split(",").map(v => parseFloat(v.trim()));
+                    if (!isNaN(lat) && !isNaN(lng)) {
+                      socket.emit("Atualizar Entrega", {
+                        ...entrega,
+                        coordenadas: {
+                          latitude: lat,
+                          longitude: lng
+                        }
+                      });
+                    }
+                  }}
+                  placeholder="-25.838523944195668, -48.53857383068678"
+                  className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-white text-sm font-mono 
+                    focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 
+                    transition-all duration-300 backdrop-blur-sm shadow-inner shadow-black/10 mb-4"
+                />
+              </div>
+
+              <button
+                onClick={() => {
+                  setCurrentView("details");
+                  onFinishEdit();
+                }}
+                className="w-full bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium py-2 px-4 
+                  rounded-lg transition-all transform hover:scale-105"
+              >
+                Posicionar
+              </button>
+            </div>
           </motion.div>
         )}
 
@@ -656,16 +753,31 @@ const DeliveryRoutes = ({
     // Limpa as rotas existentes
     clearRoutes();
 
+    // Obtém o horário atual
+    const horaAtual = new Date().getHours();
+    const minutosAtual = new Date().getMinutes();
+
     // Para cada entregador
     users.forEach((user) => {
       // Filtrar entregas do entregador
       const userDeliveries = entregas.filter((entrega) => {
-        // Se a entrega tem um entregador atribuído, verifica se é o usuário atual
+        // Verifica se a entrega tem um entregador atribuído
         if (entrega.entregador) {
-          // Verifica se o entregador é o atual E se o status é Disponível ou Andamento
+          // Obtém o horário da entrega
+          const [horaEntrega, minutosEntrega] = entrega.horario || [0, 0];
+
+          // Converte horários para minutos para facilitar comparação
+          const minutosAtuais = horaAtual * 60 + minutosAtual;
+          const minutosEntregaProgramada = horaEntrega * 60 + minutosEntrega;
+
+          // Verifica se:
+          // 1. O entregador é o atual
+          // 2. O status é Disponível ou Andamento
+          // 3. O horário atual é maior que o horário programado da entrega
           return (
             entrega.entregador === user.userName &&
-            (entrega.status === "Disponível" || entrega.status === "Andamento")
+            (entrega.status === "Disponível" || entrega.status === "Andamento") &&
+            minutosAtuais >= minutosEntregaProgramada
           );
         }
         // Se não tem entregador, não inclui na rota
@@ -840,11 +952,11 @@ export default function Map() {
   );
 
   useEffect(() => {
-    const newSocket = io("https://web-production-0d584.up.railway.app/");
+    const newSocket = io("https://servidor-ecoclean-remaster-production.up.railway.app/");
     setSocket(newSocket);
 
     // Listener para atualizações de usuários
-    newSocket.on("todos-usuarios", (updatedUsers: usuarioTipo[]) => {
+    newSocket.on("Buscar Usuarios", (updatedUsers: usuarioTipo[]) => {
       setUsers(updatedUsers);
       setShowUpdateNotification(true);
 

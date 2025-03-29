@@ -84,6 +84,9 @@ export default function GenerateDeliveryBox({
       latitude: 0,
       longitude: 0,
     },
+    horario: [new Date().getHours(), new Date().getMinutes()],
+    statusPagamento: "Aguardando",
+    volume: "Pequeno",
   });
   const [isLoadingCoordinates, setIsLoadingCoordinates] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -93,8 +96,12 @@ export default function GenerateDeliveryBox({
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { setEntregas } = useEntregas();
-
-  const { clientes } = useClientes();
+  const { clientes, setClientes } = useClientes();
+  const [isEditingClient, setIsEditingClient] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState("Conectado ao servidor");
+  const [fetchingStatus, setFetchingStatus] = useState(false);
+  const [fetchingClients, setFetchingClients] = useState(false);
+  const [fetchingUsers, setFetchingUsers] = useState(false);
 
   // Filtra os clientes baseado no termo de busca
   const filteredClients = clientes.filter((client) =>
@@ -190,54 +197,78 @@ export default function GenerateDeliveryBox({
         latitude: 0,
         longitude: 0,
       },
+      horario: [new Date().getHours(), new Date().getMinutes()],
+      statusPagamento: "Aguardando",
+      volume: "Pequeno",
     });
   };
 
   useEffect(() => {
-    // Verifica se já existe uma conexão socket
-    if (!socket) {
-      // Inicializa a conexão socket
-      const socketInstance = io(
-        "https://web-production-0d584.up.railway.app/",
-        {
-          transports: ["websocket"],
-        }
+    let isSubscribed = true;
+
+    // Verifica se já existe uma conexão
+    if (socket) return;
+
+    // Inicializa a conexão socket
+    const socketInstance = io("https://servidor-ecoclean-remaster-production.up.railway.app/", {
+      transports: ["websocket"],
+    });
+
+    setSocket(socketInstance);
+
+    // Gerencia eventos de conexão
+    socketInstance.on("connect", () => {
+      console.log("Conectado ao servidor Socket.IO");
+
+      // Emite as requisições iniciais
+      socketInstance.emit("Entregas do Dia");
+      socketInstance.emit("Buscar Clientes");
+    });
+
+    // Configuração dos listeners
+    socketInstance.on("Entregas do Dia", (entregas: entregasTipo[]) => {
+      console.log("Entregas do dia recebidas:", entregas);
+      setEntregas(entregas);
+      setIsSubmitting(false);
+      resetForm(); // Reseta o formulário quando receber atualizações das entregas
+    });
+
+    socketInstance.on("Buscar Clientes", (clientes: clientesTipo[]) => {
+      console.log("Clientes recebidos:", clientes);
+      if (clientes && Array.isArray(clientes)) {
+        setClientes(clientes);
+      }
+    });
+
+    socketInstance.on("Atualizar Cliente", (clientes: clientesTipo[]) => {
+      console.log("Clientes atualizados recebidos via Atualizar Cliente:", clientes);
+      if (clientes && Array.isArray(clientes)) {
+        setClientes(clientes);
+        // Reseta o estado de edição após atualizar os clientes
+        setIsEditingClient(false);
+      }
+    });
+
+    socketInstance.on("connect_error", (error) => {
+      console.error("Erro na conexão socket:", error);
+      alert(
+        "Erro ao conectar com o servidor. Verifique se o servidor está rodando em https://servidor-ecoclean-remaster-production.up.railway.app"
       );
+    });
 
-      // Ouvinte para conexão estabelecida
-      socketInstance.on("connect", () => {
-        console.log("Socket conectado:", socketInstance.id);
-      });
-
-      // Ouvinte para erros de conexão
-      socketInstance.on("connect_error", (error) => {
-        console.error("Erro na conexão socket:", error);
-        alert(
-          "Erro ao conectar com o servidor. Verifique se o servidor está rodando em http://localhost:3000"
-        );
-      });
-
-      // Ouvinte para atualizações de entregas
-      socketInstance.on("Atualizando entregas", (entregas: entregasTipo[]) => {
-        console.log("Entregas atualizadas:", entregas);
-        setEntregas(entregas);
-        setIsSubmitting(false);
-        resetForm(); // Reseta o formulário ao invés de fechar
-      });
-
-      // Salva a instância do socket
-      setSocket(socketInstance);
-    }
-
-    // Cleanup na desmontagem
+    // Cleanup
     return () => {
-      if (socket) {
-        socket.off("Atualizando entregas");
-        socket.off("connect");
-        socket.off("connect_error");
+      isSubscribed = false;
+      if (socketInstance) {
+        socketInstance.off("connect");
+        socketInstance.off("connect_error");
+        socketInstance.off("Entregas do Dia");
+        socketInstance.off("Buscar Clientes");
+        socketInstance.off("Atualizar Cliente");
+        socketInstance.disconnect();
       }
     };
-  }, []); // Removido setEntregas da dependência para evitar reconexões desnecessárias
+  }, [setEntregas, setClientes]); // Dependências necessárias
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -300,13 +331,16 @@ export default function GenerateDeliveryBox({
       entregador: formData.entregador!,
       volume: formData.volume!,
       observacoes: formData.observacoes,
+      horario: formData.horario || [new Date().getHours(), new Date().getMinutes()],
+      statusPagamento: formData.statusPagamento || "Aguardando",
+      statusMensagem: "Não Enviado",
     };
 
     // Log para debug
     console.log("Enviando nova entrega:", novaEntrega);
 
     // Emite o evento de criar entrega
-    socket.emit("Criar Entrega", novaEntrega);
+    socket.emit("Adicionar Entrega", novaEntrega);
   };
 
   return (
@@ -451,7 +485,7 @@ export default function GenerateDeliveryBox({
 
                             {/* Lista de Clientes */}
                             <div
-                              className="overflow-y-auto h-[120px] space-y-2 pr-2
+                              className="overflow-y-auto h-[200px] space-y-2 pr-2
                                 [&::-webkit-scrollbar]:w-1.5
                                 [&::-webkit-scrollbar-track]:bg-transparent
                                 [&::-webkit-scrollbar-thumb]:bg-white/10
@@ -495,6 +529,7 @@ export default function GenerateDeliveryBox({
                                 <motion.button
                                   whileHover={{ scale: 1.05 }}
                                   whileTap={{ scale: 0.95 }}
+                                  onClick={() => setIsEditingClient(true)}
                                   className="p-1.5 rounded-lg bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 
                                     transition-colors border border-purple-500/20 hover:border-purple-500/30 group"
                                 >
@@ -503,15 +538,14 @@ export default function GenerateDeliveryBox({
                               )}
                             </h3>
 
-                            {selectedClient ? (
+                            {selectedClient && !isEditingClient ? (
                               <div className="space-y-4 bg-slate-800/50 p-4 rounded-lg border border-white/10">
                                 <div>
                                   <label className="block text-xs text-slate-400">
                                     Endereço
                                   </label>
                                   <p className="text-slate-200">
-                                    {selectedClient.rua},{" "}
-                                    {selectedClient.numero}
+                                    {selectedClient.rua}, {selectedClient.numero}
                                   </p>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
@@ -536,12 +570,186 @@ export default function GenerateDeliveryBox({
                                   <label className="block text-xs text-slate-400">
                                     Coordenadas
                                   </label>
-                                  <p className="text-slate-200">
-                                    {selectedClient.coordenadas.latitude},{" "}
-                                    {selectedClient.coordenadas.longitude}
+                                  <p className="text-slate-200 font-mono text-xs">
+                                    {selectedClient.coordenadas.latitude}, {selectedClient.coordenadas.longitude}
                                   </p>
                                 </div>
                               </div>
+                            ) : selectedClient && isEditingClient ? (
+                              <motion.div
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -10 }}
+                                className="space-y-4 bg-slate-800/50 p-4 rounded-lg border border-white/10"
+                              >
+                                <div>
+                                  <label className="block text-xs text-slate-400 mb-1">Nome</label>
+                                  <input
+                                    type="text"
+                                    value={selectedClient.nome}
+                                    onChange={(e) => setSelectedClient({
+                                      ...selectedClient,
+                                      nome: e.target.value
+                                    })}
+                                    className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-300 backdrop-blur-sm shadow-inner shadow-black/10"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="block text-xs text-slate-400 mb-1">Telefone</label>
+                                  <input
+                                    type="text"
+                                    value={selectedClient.telefone}
+                                    onChange={(e) => setSelectedClient({
+                                      ...selectedClient,
+                                      telefone: e.target.value
+                                    })}
+                                    className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-300 backdrop-blur-sm shadow-inner shadow-black/10"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="block text-xs text-slate-400 mb-1">Cidade</label>
+                                  <input
+                                    type="text"
+                                    value={selectedClient.cidade}
+                                    onChange={(e) => setSelectedClient({
+                                      ...selectedClient,
+                                      cidade: e.target.value
+                                    })}
+                                    className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-300 backdrop-blur-sm shadow-inner shadow-black/10"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="block text-xs text-slate-400 mb-1">Bairro</label>
+                                  <input
+                                    type="text"
+                                    value={selectedClient.bairro}
+                                    onChange={(e) => setSelectedClient({
+                                      ...selectedClient,
+                                      bairro: e.target.value
+                                    })}
+                                    className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-300 backdrop-blur-sm shadow-inner shadow-black/10"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="block text-xs text-slate-400 mb-1">Rua</label>
+                                  <input
+                                    type="text"
+                                    value={selectedClient.rua}
+                                    onChange={(e) => setSelectedClient({
+                                      ...selectedClient,
+                                      rua: e.target.value
+                                    })}
+                                    className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-300 backdrop-blur-sm shadow-inner shadow-black/10"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="block text-xs text-slate-400 mb-1">Número</label>
+                                  <input
+                                    type="text"
+                                    value={selectedClient.numero}
+                                    onChange={(e) => setSelectedClient({
+                                      ...selectedClient,
+                                      numero: e.target.value
+                                    })}
+                                    className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-300 backdrop-blur-sm shadow-inner shadow-black/10"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="block text-xs text-slate-400 mb-1">Coordenadas</label>
+                                  <div className="space-y-2">
+                                    <button
+                                      type="button"
+                                      onClick={async () => {
+                                        if (
+                                          !selectedClient.rua ||
+                                          !selectedClient.numero ||
+                                          !selectedClient.bairro ||
+                                          !selectedClient.cidade
+                                        ) {
+                                          alert("Preencha o endereço completo primeiro");
+                                          return;
+                                        }
+
+                                        try {
+                                          const coordinates = await getCoordinates({
+                                            rua: selectedClient.rua,
+                                            numero: selectedClient.numero,
+                                            bairro: selectedClient.bairro,
+                                            cidade: selectedClient.cidade,
+                                          });
+
+                                          setSelectedClient({
+                                            ...selectedClient,
+                                            coordenadas: coordinates,
+                                          });
+                                        } catch (error) {
+                                          alert(
+                                            "Não foi possível encontrar as coordenadas para este endereço"
+                                          );
+                                        }
+                                      }}
+                                      className="w-full px-4 py-3 bg-blue-600/20 hover:bg-blue-600/30 
+                                        text-blue-400 rounded-lg transition-all flex items-center justify-center gap-2
+                                        disabled:opacity-50 disabled:cursor-not-allowed border border-blue-500/20 hover:border-blue-500/30"
+                                    >
+                                      <GlobeAltIcon className="h-5 w-5" />
+                                      Gerar Localização Online
+                                    </button>
+                                    <input
+                                      type="text"
+                                      value={`${selectedClient.coordenadas.latitude}, ${selectedClient.coordenadas.longitude}`}
+                                      onChange={(e) => {
+                                        const [lat, lng] = e.target.value.split(",").map(v => parseFloat(v.trim()));
+                                        setSelectedClient({
+                                          ...selectedClient,
+                                          coordenadas: {
+                                            latitude: lat || 0,
+                                            longitude: lng || 0
+                                          }
+                                        });
+                                      }}
+                                      placeholder="-25.838523944195668, -48.53857383068678"
+                                      className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-slate-200 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-300 backdrop-blur-sm shadow-inner shadow-black/10"
+                                    />
+                                  </div>
+                                </div>
+
+                                <div className="flex gap-2 pt-2">
+                                  <motion.button
+                                    onClick={() => {
+                                      if (socket) {
+                                        socket.emit("Atualizar Cliente", selectedClient);
+                                      }
+                                      setIsEditingClient(false);
+                                    }}
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    className="flex-1 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 
+                                      rounded-lg py-2 font-medium transition-all duration-300 shadow-lg shadow-purple-500/10
+                                      hover:shadow-purple-500/20 backdrop-blur-sm border border-purple-500/30
+                                      hover:border-purple-500/50"
+                                  >
+                                    Salvar
+                                  </motion.button>
+                                  <motion.button
+                                    onClick={() => setIsEditingClient(false)}
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    className="flex-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 
+                                      rounded-lg py-2 font-medium transition-all duration-300 shadow-lg shadow-rose-500/10
+                                      hover:shadow-rose-500/20 backdrop-blur-sm border border-rose-500/30
+                                      hover:border-rose-500/50"
+                                  >
+                                    Cancelar
+                                  </motion.button>
+                                </div>
+                              </motion.div>
                             ) : (
                               <div className="h-full flex items-center justify-center text-slate-400 text-sm p-8">
                                 Selecione um cliente para ver os detalhes
@@ -598,9 +806,48 @@ export default function GenerateDeliveryBox({
 
                           {/* Endereço */}
                           <div className="space-y-4">
-                            <h3 className="text-sm font-medium text-slate-300 flex items-center gap-2">
-                              <MapPinIcon className="h-4 w-4" />
-                              Endereço
+                            <h3 className="text-sm font-medium text-slate-300 flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <MapPinIcon className="h-4 w-4" />
+                                Endereço
+                              </div>
+                              <motion.button
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
+                                onClick={() => {
+                                  // Verificar se temos todas as informações necessárias
+                                  if (!formData.nome || !formData.telefone || !formData.cidade || !formData.bairro || !formData.rua || !formData.numero) {
+                                    alert("Por favor, preencha todos os campos do cliente antes de adicioná-lo");
+                                    return;
+                                  }
+
+                                  // Criar objeto clienteTipo
+                                  const novoCliente: clientesTipo = {
+                                    nome: formData.nome,
+                                    telefone: formData.telefone || "",
+                                    cidade: formData.cidade,
+                                    bairro: formData.bairro,
+                                    rua: formData.rua,
+                                    numero: formData.numero,
+                                    coordenadas: formData.coordenadas || {
+                                      latitude: 0,
+                                      longitude: 0
+                                    }
+                                  };
+
+                                  // Enviar para o servidor
+                                  if (socket) {
+                                    socket.emit("Atualizar Cliente", novoCliente);
+                                  }
+                                }}
+                                className="px-3 py-1.5 bg-purple-500/10 hover:bg-purple-500/20 
+                                  text-purple-400 rounded-lg transition-all duration-300 flex items-center gap-2
+                                  border border-purple-500/20 hover:border-purple-500/30 shadow-lg shadow-purple-500/10
+                                  backdrop-blur-sm group"
+                              >
+                                <UserPlusIcon className="h-4 w-4 transition-transform group-hover:scale-110" />
+                                <span className="text-sm">Adicionar Cliente</span>
+                              </motion.button>
                             </h3>
                             <div className="grid grid-cols-2 gap-4">
                               <div>
@@ -754,6 +1001,27 @@ export default function GenerateDeliveryBox({
                               <option value="PIX">PIX</option>
                               <option value="Dinheiro">Dinheiro</option>
                               <option value="Cartão">Cartão</option>
+                              <option value="Boleto">Boleto</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs text-slate-400 mb-1">
+                              Status do Pagamento
+                            </label>
+                            <select
+                              value={formData.statusPagamento || "Aguardando"}
+                              onChange={(e) =>
+                                setFormData({
+                                  ...formData,
+                                  statusPagamento: e.target.value,
+                                })
+                              }
+                              className="w-full px-3 py-2 bg-slate-800/50 border border-white/10 rounded-lg
+                                focus:outline-none focus:border-blue-500 text-slate-200"
+                              required
+                            >
+                              <option value="Aguardando">Aguardando</option>
+                              <option value="Confirmado">Confirmado</option>
                             </select>
                           </div>
                         </div>
@@ -808,6 +1076,56 @@ export default function GenerateDeliveryBox({
                                 focus:outline-none focus:border-blue-500 text-slate-200"
                               required
                             />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-slate-400 mb-1">
+                              Horário
+                            </label>
+                            <div className="flex gap-2">
+                              <input
+                                type="number"
+                                min="0"
+                                max="23"
+                                value={formData.horario ? formData.horario[0] : new Date().getHours()}
+                                onChange={(e) => {
+                                  const hours = parseInt(e.target.value, 10);
+                                  setFormData({
+                                    ...formData,
+                                    horario: [
+                                      hours,
+                                      formData.horario ? formData.horario[1] : new Date().getMinutes()
+                                    ],
+                                  });
+                                }}
+                                className="w-16 px-2 py-2 bg-slate-800/50 border border-white/10 rounded-lg
+                                  focus:outline-none focus:border-blue-500 text-slate-200
+                                  [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                placeholder="Hora"
+                                required
+                              />
+                              <span className="flex items-center text-slate-400">:</span>
+                              <input
+                                type="number"
+                                min="0"
+                                max="59"
+                                value={formData.horario ? formData.horario[1] : new Date().getMinutes()}
+                                onChange={(e) => {
+                                  const minutes = parseInt(e.target.value, 10);
+                                  setFormData({
+                                    ...formData,
+                                    horario: [
+                                      formData.horario ? formData.horario[0] : new Date().getHours(),
+                                      minutes
+                                    ],
+                                  });
+                                }}
+                                className="w-16 px-2 py-2 bg-slate-800/50 border border-white/10 rounded-lg
+                                  focus:outline-none focus:border-blue-500 text-slate-200
+                                  [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                placeholder="Min"
+                                required
+                              />
+                            </div>
                           </div>
                           <div>
                             <label className="block text-xs text-slate-400 mb-1">
@@ -969,49 +1287,38 @@ export default function GenerateDeliveryBox({
                     <div className="space-y-4">
                       <div>
                         <label className="block text-xs text-slate-400 mb-1">
-                          Latitude
+                          Coordenadas (latitude, longitude)
                         </label>
                         <input
-                          type="number"
-                          step="any"
-                          value={formData.coordenadas?.latitude ?? 0}
+                          type="text"
+                          placeholder="-25.827680, -48.539575"
+                          value={`${formData.coordenadas?.latitude ?? 0}, ${formData.coordenadas?.longitude ?? 0}`}
                           onChange={(e) => {
-                            const currentLat = parseFloat(e.target.value);
-                            setFormData({
-                              ...formData,
-                              coordenadas: {
-                                longitude: formData.coordenadas?.longitude ?? 0,
-                                latitude: currentLat,
-                              },
-                            });
+                            const coordsString = e.target.value;
+                            
+                            // Verifica se o formato é válido: latitude, longitude
+                            const coordsMatch = coordsString.match(/^\s*(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)\s*$/);
+                            
+                            if (coordsMatch) {
+                              const latitude = parseFloat(coordsMatch[1]);
+                              const longitude = parseFloat(coordsMatch[2]);
+                              
+                              setFormData({
+                                ...formData,
+                                coordenadas: {
+                                  latitude,
+                                  longitude
+                                },
+                              });
+                            }
                           }}
                           className="w-full px-3 py-2 bg-slate-800/50 border border-white/10 rounded-lg
                             focus:outline-none focus:border-blue-500 text-slate-200"
                           required
                         />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-slate-400 mb-1">
-                          Longitude
-                        </label>
-                        <input
-                          type="number"
-                          step="any"
-                          value={formData.coordenadas?.longitude ?? 0}
-                          onChange={(e) => {
-                            const currentLong = parseFloat(e.target.value);
-                            setFormData({
-                              ...formData,
-                              coordenadas: {
-                                latitude: formData.coordenadas?.latitude ?? 0,
-                                longitude: currentLong,
-                              },
-                            });
-                          }}
-                          className="w-full px-3 py-2 bg-slate-800/50 border border-white/10 rounded-lg
-                            focus:outline-none focus:border-blue-500 text-slate-200"
-                          required
-                        />
+                        <p className="text-xs text-slate-500 mt-1">
+                          Digite as coordenadas no formato: latitude, longitude
+                        </p>
                       </div>
                     </div>
 

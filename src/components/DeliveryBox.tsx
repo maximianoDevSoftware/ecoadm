@@ -15,6 +15,7 @@ import {
   PlayIcon,
 } from "@heroicons/react/24/outline";
 import { useEntregas } from "@/contexts/EntregasContext";
+import { useClientes } from "@/contexts/ClientesContext";
 import { entregasTipo } from "@/types/entregasTypes";
 import { clientesTipo } from "@/types/clientesType";
 import { io } from "socket.io-client";
@@ -34,6 +35,7 @@ export default function DeliveryBox({
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingClient, setIsEditingClient] = useState(false);
   const { entregas, setEntregas } = useEntregas();
+  const { setClientes } = useClientes();
   const [editFormData, setEditFormData] = useState<entregasTipo | null>(null);
   const [editClientFormData, setEditClientFormData] =
     useState<clientesTipo | null>(null);
@@ -44,28 +46,62 @@ export default function DeliveryBox({
   }>({});
 
   useEffect(() => {
-    const newSocket = io("https://web-production-0d584.up.railway.app/");
+    console.log("Iniciando a conexão socket no DeliveryBox");
+    const newSocket = io("https://servidor-ecoclean-remaster-production.up.railway.app/");
     setSocket(newSocket);
 
-    // Listener para o evento "Atualizando entregas"
-    newSocket.on("Atualizando entregas", (entregas: entregasTipo[]) => {
+    // Listener para o evento "Entregas do Dia"
+    newSocket.on("Entregas do Dia", (entregas: entregasTipo[]) => {
       setEntregas(entregas);
+      // Atualiza o selectedDelivery quando as entregas são atualizadas
+      if (selectedDelivery) {
+        const updatedSelectedDelivery = entregas.find(
+          (entrega) => entrega.id === selectedDelivery.id
+        );
+        if (updatedSelectedDelivery) {
+          setSelectedDelivery(updatedSelectedDelivery);
+        }
+      }
       setIsSaving(false);
       setIsEditing(false);
       setEditFormData(null);
     });
 
-    // Listener para o evento "Atualizando clientes"
-    newSocket.on("Atualizando clientes", () => {
+    // Listener para o evento "Buscar Clientes"
+    newSocket.on("Buscar Clientes", (clientes) => {
+      console.log("Clientes recebidos via Buscar Clientes:", clientes);
+      setClientes(clientes);
       setIsSaving(false);
       setIsEditingClient(false);
       setEditClientFormData(null);
     });
 
+    // Adiciona um listener específico para "Atualizar Cliente"
+    newSocket.on("Atualizar Cliente", (clientes) => {
+      console.log("Clientes atualizados recebidos via Atualizar Cliente:", clientes);
+      console.log("Tipo de dados recebido:", typeof clientes, Array.isArray(clientes) ? "É um array" : "Não é um array");
+      
+      // Se não for um array ou for indefinido, registra o erro e não atualiza o estado
+      if (!clientes || typeof clientes !== 'object' || !Array.isArray(clientes)) {
+        console.error("Dados de clientes inválidos recebidos:", clientes);
+        setIsSaving(false);
+        return;
+      }
+      
+      setClientes(clientes);
+      setIsSaving(false);
+      setIsEditingClient(false);
+      setEditClientFormData(null);
+    });
+
+    // Limpa os listeners e desconecta o socket quando o componente é desmontado
     return () => {
-      newSocket.close();
+      newSocket.off("Entregas do Dia");
+      newSocket.off("Buscar Clientes");
+      newSocket.off("Atualizar Cliente");
+      newSocket.disconnect();
     };
-  }, [setEntregas]);
+  }, [setEntregas, setClientes]);
 
   const actionButtons = [
     {
@@ -394,6 +430,52 @@ export default function DeliveryBox({
                                 Em Andamento
                               </button>
 
+                              {/* Botão de Status de Pagamento */}
+                              <select
+                                value={delivery.statusPagamento || "Aguardando"}
+                                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                                  e.stopPropagation();
+                                  if (socket?.connected) {
+                                    const updatedDelivery = {
+                                      ...delivery,
+                                      statusPagamento: e.target.value,
+                                    };
+                                    socket.emit("Atualizar Entrega", updatedDelivery);
+                                    
+                                    // Atualiza o selectedDelivery imediatamente para refletir a mudança na UI
+                                    if (selectedDelivery && selectedDelivery.id === delivery.id) {
+                                      setSelectedDelivery(updatedDelivery);
+                                    }
+                                  }
+                                }}
+                                className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all 
+                                  duration-300 backdrop-blur-sm cursor-pointer
+                                  ${
+                                    delivery.status === "Andamento"
+                                      ? "bg-blue-500/20 text-blue-400 border border-blue-500/50 shadow-[0_0_10px_rgba(59,130,246,0.5)]"
+                                      : delivery.statusPagamento === "Confirmado"
+                                      ? "bg-green-500/20 text-green-400 border border-green-500/50 shadow-[0_0_10px_rgba(34,197,94,0.5)]"
+                                      : "bg-slate-500/20 text-slate-400 border border-slate-500/30"
+                                  }
+                                  focus:outline-none focus:ring-2 focus:ring-blue-500/50
+                                  hover:bg-opacity-30 active:scale-[0.98]
+                                  [&>option]:bg-slate-800/95 [&>option]:backdrop-blur-xl [&>option]:text-slate-200
+                                  [&>option:hover]:bg-slate-700`}
+                                style={{
+                                  WebkitAppearance: "none",
+                                  MozAppearance: "none",
+                                  appearance: "none",
+                                  backgroundImage: "url(\"data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%2380AFFF' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3E%3C/svg%3E\")",
+                                  backgroundPosition: "right 0.5rem center",
+                                  backgroundRepeat: "no-repeat",
+                                  backgroundSize: "1.5em 1.5em",
+                                  paddingRight: "2.5rem"
+                                }}
+                              >
+                                <option value="Aguardando">Aguardando Pagamento</option>
+                                <option value="Confirmado">Pagamento Confirmado</option>
+                              </select>
+
                               <button
                                 onClick={(e: React.MouseEvent) => {
                                   e.stopPropagation();
@@ -512,6 +594,25 @@ export default function DeliveryBox({
                                     </p>
                                   </div>
 
+                                  <div>
+                                    <label className="text-xs text-slate-400">
+                                      Status de Pagamento
+                                    </label>
+                                    <p className="text-slate-200">
+                                      {delivery.statusPagamento === "Confirmado" ? (
+                                        <span className="text-green-400 font-medium relative inline-block">
+                                          <span className="absolute inset-0 bg-green-400/10 rounded-md blur-md"></span>
+                                          <span className="relative z-10">Confirmado</span>
+                                        </span>
+                                      ) : (
+                                        <span className="text-amber-400 font-medium relative inline-block">
+                                          <span className="absolute inset-0 bg-amber-400/10 rounded-md blur-md"></span>
+                                          <span className="relative z-10">Aguardando</span>
+                                        </span>
+                                      )}
+                                    </p>
+                                  </div>
+
                                   {delivery.observacoes && (
                                     <div>
                                       <label className="text-xs text-slate-400">
@@ -533,7 +634,7 @@ export default function DeliveryBox({
                                   [&::-webkit-scrollbar-thumb]:rounded-full
                                   [&::-webkit-scrollbar-thumb]:hover:bg-white/10
                                   hover:[&::-webkit-scrollbar]:w-1.5
-                                  transition-all duration-300"
+                                  transition-all duration-300 animate-in fade-in slide-in-from-bottom-6 duration-300"
                                 >
                                   <div>
                                     <label className="text-xs text-slate-400">
@@ -633,6 +734,85 @@ export default function DeliveryBox({
 
                                   <div>
                                     <label className="text-xs text-slate-400">
+                                      Data da Entrega
+                                    </label>
+                                    <div className="flex gap-2">
+                                      <div className="flex-1">
+                                        <input
+                                          type="date"
+                                          value={
+                                            editFormData?.dia
+                                              ? `${editFormData.dia[2]}-${String(
+                                                  editFormData.dia[1]
+                                                ).padStart(2, "0")}-${String(
+                                                  editFormData.dia[0]
+                                                ).padStart(2, "0")}`
+                                              : ""
+                                          }
+                                          onChange={(e) => {
+                                            const [year, month, day] = e.target.value
+                                              .split("-")
+                                              .map(Number);
+                                            if (year && month && day) {
+                                              setEditFormData((prev) => ({
+                                                ...prev!,
+                                                dia: [day, month, year],
+                                              }));
+                                            }
+                                          }}
+                                          className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-slate-200 text-sm"
+                                        />
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div>
+                                    <label className="text-xs text-slate-400">
+                                      Horário
+                                    </label>
+                                    <div className="flex gap-2">
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        max="23"
+                                        value={editFormData?.horario?.[0] || 0}
+                                        onChange={(e) => {
+                                          const hours = parseInt(e.target.value);
+                                          setEditFormData((prev) => ({
+                                            ...prev!,
+                                            horario: [
+                                              hours,
+                                              prev?.horario?.[1] || 0,
+                                            ],
+                                          }));
+                                        }}
+                                        className="w-16 px-2 py-2 bg-slate-800/50 border border-white/10 rounded-lg text-slate-200 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                        placeholder="Hora"
+                                      />
+                                      <span className="flex items-center text-slate-400">:</span>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        max="59"
+                                        value={editFormData?.horario?.[1] || 0}
+                                        onChange={(e) => {
+                                          const minutes = parseInt(e.target.value);
+                                          setEditFormData((prev) => ({
+                                            ...prev!,
+                                            horario: [
+                                              prev?.horario?.[0] || 0,
+                                              minutes,
+                                            ],
+                                          }));
+                                        }}
+                                        className="w-16 px-2 py-2 bg-slate-800/50 border border-white/10 rounded-lg text-slate-200 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                        placeholder="Min"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  <div>
+                                    <label className="text-xs text-slate-400">
                                       Entregador
                                     </label>
                                     <select
@@ -690,6 +870,26 @@ export default function DeliveryBox({
                                       <option value="PIX">PIX</option>
                                       <option value="Dinheiro">Dinheiro</option>
                                       <option value="Cartão">Cartão</option>
+                                      <option value="Boleto">Boleto</option>
+                                    </select>
+                                  </div>
+
+                                  <div>
+                                    <label className="text-xs text-slate-400">
+                                      Status de Pagamento
+                                    </label>
+                                    <select
+                                      value={editFormData?.statusPagamento || "Aguardando"}
+                                      onChange={(e) =>
+                                        setEditFormData((prev) => ({
+                                          ...prev!,
+                                          statusPagamento: e.target.value,
+                                        }))
+                                      }
+                                      className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-slate-200 text-sm"
+                                    >
+                                      <option value="Aguardando">Aguardando Pagamento</option>
+                                      <option value="Confirmado">Pagamento Confirmado</option>
                                     </select>
                                   </div>
 
@@ -745,10 +945,9 @@ export default function DeliveryBox({
                                       onClick={() => {
                                         if (socket && editFormData) {
                                           setIsSaving(true);
-                                          socket.emit(
-                                            "Atualizar Entrega",
-                                            editFormData
-                                          );
+                                          socket.emit("Atualizar Entrega", editFormData);
+                                          // Limpa o painel de detalhes após salvar
+                                          setSelectedDelivery(null);
                                         }
                                       }}
                                       disabled={isSaving}
@@ -785,12 +984,29 @@ export default function DeliveryBox({
               <div className="w-80 p-6 bg-slate-900/50 flex flex-col">
                 {selectedDelivery ? (
                   <>
-                    <h3 className="text-lg font-semibold text-slate-200 mb-6">
-                      {isEditing
-                        ? "Editar Entrega"
+                    <h3 className={`text-lg font-semibold mb-6 flex items-center gap-2 ${
+                      isEditing
+                        ? "text-amber-400"
                         : isEditingClient
-                        ? "Editar Cliente"
-                        : "Detalhes da Entrega"}
+                        ? "text-purple-400"
+                        : "text-slate-200"
+                    }`}>
+                      {isEditing && (
+                        <PencilSquareIcon className="h-5 w-5 text-amber-400" />
+                      )}
+                      {isEditingClient && (
+                        <UserIcon className="h-5 w-5 text-purple-400" />
+                      )}
+                      {!isEditing && !isEditingClient && (
+                        <ClipboardDocumentIcon className="h-5 w-5 text-slate-400" />
+                      )}
+                      <span>
+                        {isEditing
+                          ? "Editar Entrega"
+                          : isEditingClient
+                          ? "Editar Cliente"
+                          : "Detalhes da Entrega"}
+                      </span>
                     </h3>
 
                     {isEditing ? (
@@ -803,7 +1019,7 @@ export default function DeliveryBox({
                         [&::-webkit-scrollbar-thumb]:rounded-full
                         [&::-webkit-scrollbar-thumb]:hover:bg-white/10
                         hover:[&::-webkit-scrollbar]:w-1.5
-                        transition-all duration-300"
+                        transition-all duration-300 animate-in fade-in slide-in-from-bottom-6 duration-300"
                       >
                         <div>
                           <label className="text-xs text-slate-400">
@@ -903,6 +1119,85 @@ export default function DeliveryBox({
 
                         <div>
                           <label className="text-xs text-slate-400">
+                            Data da Entrega
+                          </label>
+                          <div className="flex gap-2">
+                            <div className="flex-1">
+                              <input
+                                type="date"
+                                value={
+                                  editFormData?.dia
+                                    ? `${editFormData.dia[2]}-${String(
+                                        editFormData.dia[1]
+                                      ).padStart(2, "0")}-${String(
+                                        editFormData.dia[0]
+                                      ).padStart(2, "0")}`
+                                    : ""
+                                }
+                                onChange={(e) => {
+                                  const [year, month, day] = e.target.value
+                                    .split("-")
+                                    .map(Number);
+                                  if (year && month && day) {
+                                    setEditFormData((prev) => ({
+                                      ...prev!,
+                                      dia: [day, month, year],
+                                    }));
+                                  }
+                                }}
+                                className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-slate-200 text-sm"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-slate-400">
+                            Horário
+                          </label>
+                          <div className="flex gap-2">
+                            <input
+                              type="number"
+                              min="0"
+                              max="23"
+                              value={editFormData?.horario?.[0] || 0}
+                              onChange={(e) => {
+                                const hours = parseInt(e.target.value);
+                                setEditFormData((prev) => ({
+                                  ...prev!,
+                                  horario: [
+                                    hours,
+                                    prev?.horario?.[1] || 0,
+                                  ],
+                                }));
+                              }}
+                              className="w-16 px-2 py-2 bg-slate-800/50 border border-white/10 rounded-lg text-slate-200 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              placeholder="Hora"
+                            />
+                            <span className="flex items-center text-slate-400">:</span>
+                            <input
+                              type="number"
+                              min="0"
+                              max="59"
+                              value={editFormData?.horario?.[1] || 0}
+                              onChange={(e) => {
+                                const minutes = parseInt(e.target.value);
+                                setEditFormData((prev) => ({
+                                  ...prev!,
+                                  horario: [
+                                    prev?.horario?.[0] || 0,
+                                    minutes,
+                                  ],
+                                }));
+                              }}
+                              className="w-16 px-2 py-2 bg-slate-800/50 border border-white/10 rounded-lg text-slate-200 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              placeholder="Min"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-slate-400">
                             Entregador
                           </label>
                           <select
@@ -916,7 +1211,10 @@ export default function DeliveryBox({
                             className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-slate-200 text-sm"
                           >
                             {availableUsers.map((user) => (
-                              <option key={user.value} value={user.value}>
+                              <option
+                                key={user.value}
+                                value={user.value}
+                              >
                                 {user.name}
                               </option>
                             ))}
@@ -957,6 +1255,26 @@ export default function DeliveryBox({
                             <option value="PIX">PIX</option>
                             <option value="Dinheiro">Dinheiro</option>
                             <option value="Cartão">Cartão</option>
+                            <option value="Boleto">Boleto</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-slate-400">
+                            Status de Pagamento
+                          </label>
+                          <select
+                            value={editFormData?.statusPagamento || "Aguardando"}
+                            onChange={(e) =>
+                              setEditFormData((prev) => ({
+                                ...prev!,
+                                statusPagamento: e.target.value,
+                              }))
+                            }
+                            className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-slate-200 text-sm"
+                          >
+                            <option value="Aguardando">Aguardando Pagamento</option>
+                            <option value="Confirmado">Pagamento Confirmado</option>
                           </select>
                         </div>
 
@@ -984,8 +1302,12 @@ export default function DeliveryBox({
                           <input
                             type="text"
                             value={`${
-                              editFormData?.coordenadas?.latitude || ""
-                            }, ${editFormData?.coordenadas?.longitude || ""}`}
+                              editFormData?.coordenadas?.latitude ||
+                              ""
+                            }, ${
+                              editFormData?.coordenadas?.longitude ||
+                              ""
+                            }`}
                             onChange={(e) => {
                               const [lat, lng] = e.target.value
                                 .split(",")
@@ -1009,6 +1331,8 @@ export default function DeliveryBox({
                               if (socket && editFormData) {
                                 setIsSaving(true);
                                 socket.emit("Atualizar Entrega", editFormData);
+                                // Limpa o painel de detalhes após salvar
+                                setSelectedDelivery(null);
                               }
                             }}
                             disabled={isSaving}
@@ -1039,7 +1363,7 @@ export default function DeliveryBox({
                         [&::-webkit-scrollbar-thumb]:rounded-full
                         [&::-webkit-scrollbar-thumb]:hover:bg-white/10
                         hover:[&::-webkit-scrollbar]:w-1.5
-                        transition-all duration-300"
+                        transition-all duration-300 animate-in fade-in slide-in-from-bottom-6 duration-300"
                       >
                         <div>
                           <label className="text-xs text-slate-400">Nome</label>
@@ -1052,7 +1376,8 @@ export default function DeliveryBox({
                                 nome: e.target.value,
                               }))
                             }
-                            className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-slate-200 text-sm"
+                            className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 
+                              focus:border-purple-500/50 transition-all duration-300 backdrop-blur-sm shadow-inner shadow-black/10"
                           />
                         </div>
 
@@ -1069,7 +1394,9 @@ export default function DeliveryBox({
                                 telefone: e.target.value,
                               }))
                             }
-                            className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-slate-200 text-sm"
+                            className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 
+                              text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 
+                              focus:border-purple-500/50 transition-all duration-300 backdrop-blur-sm shadow-inner shadow-black/10"
                           />
                         </div>
 
@@ -1086,7 +1413,8 @@ export default function DeliveryBox({
                                 cidade: e.target.value,
                               }))
                             }
-                            className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-slate-200 text-sm"
+                            className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 
+                              focus:border-purple-500/50 transition-all duration-300 backdrop-blur-sm shadow-inner shadow-black/10"
                           />
                         </div>
 
@@ -1103,7 +1431,8 @@ export default function DeliveryBox({
                                 bairro: e.target.value,
                               }))
                             }
-                            className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-slate-200 text-sm"
+                            className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 
+                              focus:border-purple-500/50 transition-all duration-300 backdrop-blur-sm shadow-inner shadow-black/10"
                           />
                         </div>
 
@@ -1118,7 +1447,8 @@ export default function DeliveryBox({
                                 rua: e.target.value,
                               }))
                             }
-                            className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-slate-200 text-sm"
+                            className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 
+                              focus:border-purple-500/50 transition-all duration-300 backdrop-blur-sm shadow-inner shadow-black/10"
                           />
                         </div>
 
@@ -1135,7 +1465,8 @@ export default function DeliveryBox({
                                 numero: e.target.value,
                               }))
                             }
-                            className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-slate-200 text-sm"
+                            className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 
+                              focus:border-purple-500/50 transition-all duration-300 backdrop-blur-sm shadow-inner shadow-black/10"
                           />
                         </div>
 
@@ -1147,9 +1478,7 @@ export default function DeliveryBox({
                             type="text"
                             value={`${
                               editClientFormData?.coordenadas?.latitude || ""
-                            }, ${
-                              editClientFormData?.coordenadas?.longitude || ""
-                            }`}
+                            }, ${editClientFormData?.coordenadas?.longitude || ""}`}
                             onChange={(e) => {
                               const [lat, lng] = e.target.value
                                 .split(",")
@@ -1163,39 +1492,72 @@ export default function DeliveryBox({
                               }));
                             }}
                             placeholder="-25.838523944195668, -48.53857383068678"
-                            className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-slate-200 text-sm font-mono"
+                            className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 text-slate-200 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-purple-500/50 
+                              focus:border-purple-500/50 transition-all duration-300 backdrop-blur-sm shadow-inner shadow-black/10"
                           />
                         </div>
 
                         <div className="flex gap-2 pt-4">
-                          <button
+                          <motion.button
                             onClick={() => {
                               if (socket && editClientFormData) {
                                 setIsSaving(true);
-                                socket.emit(
-                                  "Atualizar Cliente",
-                                  editClientFormData
-                                );
-                                setIsEditingClient(false);
-                                setEditClientFormData(null);
+                                
+                                // Atraso pequeno para permitir a animação e feedback visual
+                                setTimeout(() => {
+                                  console.log("Enviando cliente atualizado:", editClientFormData);
+                                  socket.emit(
+                                    "Atualizar Cliente",
+                                    editClientFormData
+                                  );
+                                  // Limpa o painel de detalhes após salvar com transição mais suave
+                                  setTimeout(() => {
+                                    setSelectedDelivery(null);
+                                  }, 300);
+                                }, 300);
                               }
                             }}
                             disabled={isSaving}
-                            className="flex-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 
-                              rounded-lg py-2 font-medium transition-colors"
+                            whileHover={!isSaving ? { scale: 1.02 } : {}}
+                            whileTap={!isSaving ? { scale: 0.98 } : {}}
+                            className={`flex-1 ${
+                              isSaving ? 'bg-emerald-500/20' : 'bg-emerald-500/10 hover:bg-emerald-500/20'
+                            } text-emerald-500 
+                              rounded-lg py-2 font-medium transition-all duration-300 shadow-lg shadow-emerald-500/10
+                              hover:shadow-emerald-500/20 backdrop-blur-sm border border-emerald-500/30
+                              hover:border-emerald-500/50 ${isSaving ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                           >
-                            {isSaving ? "Salvando..." : "Salvar"}
-                          </button>
-                          <button
+                            {isSaving ? (
+                              <motion.span 
+                                className="flex items-center justify-center gap-2"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                transition={{ duration: 0.2 }}
+                              >
+                                <svg className="animate-spin h-4 w-4 text-emerald-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <span className="text-emerald-400">Atualizando cliente...</span>
+                              </motion.span>
+                            ) : (
+                              <span>Salvar</span>
+                            )}
+                          </motion.button>
+                          <motion.button
                             onClick={() => {
                               setIsEditingClient(false);
                               setEditClientFormData(null);
                             }}
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
                             className="flex-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 
-                              rounded-lg py-2 font-medium transition-colors"
+                              rounded-lg py-2 font-medium transition-all duration-300 shadow-lg shadow-rose-500/10
+                              hover:shadow-rose-500/20 backdrop-blur-sm border border-rose-500/30
+                              hover:border-rose-500/50 cursor-pointer"
                           >
-                            Cancelar
-                          </button>
+                            <span>Cancelar</span>
+                          </motion.button>
                         </div>
                       </div>
                     ) : (
@@ -1282,6 +1644,25 @@ export default function DeliveryBox({
                           </label>
                           <p className="text-slate-200">
                             {selectedDelivery.pagamento}
+                          </p>
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-slate-400">
+                            Status de Pagamento
+                          </label>
+                          <p className="text-slate-200">
+                            {selectedDelivery.statusPagamento === "Confirmado" ? (
+                              <span className="text-green-400 font-medium relative inline-block">
+                                <span className="absolute inset-0 bg-green-400/10 rounded-md blur-md"></span>
+                                <span className="relative z-10">Confirmado</span>
+                              </span>
+                            ) : (
+                              <span className="text-amber-400 font-medium relative inline-block">
+                                <span className="absolute inset-0 bg-amber-400/10 rounded-md blur-md"></span>
+                                <span className="relative z-10">Aguardando</span>
+                              </span>
+                            )}
                           </p>
                         </div>
 

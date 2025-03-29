@@ -11,11 +11,15 @@ import {
   PencilSquareIcon,
   CheckIcon,
   XMarkIcon as XIcon,
+  ChevronDownIcon,
+  ClockIcon,
 } from "@heroicons/react/24/outline";
 import { io } from "socket.io-client";
 import { entregasTipo } from "@/types/entregasTypes";
 import { useEntregas } from "@/contexts/EntregasContext";
 import TableReport from "./reports/TableReport";
+import ChartsReport from "./reports/ChartsReport";
+import FilesReport from "./reports/FilesReport";
 
 interface ReportBoxProps {
   isOpen: boolean;
@@ -28,7 +32,7 @@ type TabType = "table" | "period" | "charts" | "files";
 // Interface para célula em edição
 interface EditingCell {
   id: string;
-  field: keyof entregasTipo;
+  field: keyof entregasTipo | "all";
   value: string;
 }
 
@@ -43,6 +47,15 @@ export default function ReportBox({
   const { entregas } = useEntregas();
   const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingPeriodReport, setIsLoadingPeriodReport] = useState(false);
+  const [periodEntregas, setPeriodEntregas] = useState<entregasTipo[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedEntregaId, setSelectedEntregaId] = useState<string | null>(null);
+  const [formEntrega, setFormEntrega] = useState<entregasTipo | null>(null);
+  const [isLoadingCharts, setIsLoadingCharts] = useState(false);
+  const [chartEntregas, setChartEntregas] = useState<entregasTipo[]>([]);
+  const [isLoadingFiles, setIsLoadingFiles] = useState(false);
+  const [filesEntregas, setFilesEntregas] = useState<entregasTipo[]>([]);
 
   // Estados para os filtros
   const [filters, setFilters] = useState({
@@ -77,13 +90,68 @@ export default function ReportBox({
   ];
 
   useEffect(() => {
-    const newSocket = io("https://web-production-0d584.up.railway.app/");
+    const newSocket = io("https://servidor-ecoclean-remaster-production.up.railway.app/");
     setSocket(newSocket);
 
+    // Listener para o evento "Entregas do Dia"
+    newSocket.on("Entregas do Dia", (entregas: entregasTipo[]) => {
+      console.log("Entregas atualizadas no ReportBox", entregas);
+    });
+
+    // Listener para o evento "Relatorio Entregas"
+    newSocket.on("Relatorio Entregas", (entregas: entregasTipo[]) => {
+      console.log("Relatório completo de entregas recebido:", entregas);
+      setPeriodEntregas(entregas);
+      setChartEntregas(entregas);
+      setFilesEntregas(entregas);
+      setIsLoadingPeriodReport(false);
+      setIsLoadingCharts(false);
+      setIsLoadingFiles(false);
+      setError(null);
+    });
+
+    // Listener para erros
+    newSocket.on("error", (error: { message: string, detalhes: string }) => {
+      console.error("Erro recebido do servidor:", error);
+      setError(`Erro: ${error.message}`);
+      setIsLoadingPeriodReport(false);
+      setIsLoadingCharts(false);
+    });
+
     return () => {
+      newSocket.off("Entregas do Dia");
+      newSocket.off("Relatorio Entregas");
+      newSocket.off("error");
       newSocket.close();
     };
   }, []);
+
+  // Efeito para emitir o evento quando a aba period é selecionada
+  useEffect(() => {
+    if (activeTab === "period" && socket) {
+      setIsLoadingPeriodReport(true);
+      setError(null);
+      socket.emit("Relatorio Entregas");
+    }
+  }, [activeTab, socket]);
+
+  // Efeito para emitir o evento quando a aba charts é selecionada
+  useEffect(() => {
+    if (activeTab === "charts" && socket) {
+      setIsLoadingCharts(true);
+      setError(null);
+      socket.emit("Relatorio Entregas");
+    }
+  }, [activeTab, socket]);
+
+  // Efeito para emitir o evento quando a aba files é selecionada
+  useEffect(() => {
+    if (activeTab === "files" && socket) {
+      setIsLoadingFiles(true);
+      setError(null);
+      socket.emit("Relatorio Entregas");
+    }
+  }, [activeTab, socket]);
 
   useEffect(() => {
     if (isOpen) {
@@ -126,6 +194,13 @@ export default function ReportBox({
       (!filters.valorMaximo || valor <= parseFloat(filters.valorMaximo)) &&
       (!filters.entregador || entrega.entregador === filters.entregador)
     );
+  });
+
+  // Ordenar as entregas por data (mais recente primeiro)
+  const sortedPeriodEntregas = [...periodEntregas].sort((a, b) => {
+    const dateA = new Date(a.dia[2], a.dia[1] - 1, a.dia[0]);
+    const dateB = new Date(b.dia[2], b.dia[1] - 1, b.dia[0]);
+    return dateB.getTime() - dateA.getTime();
   });
 
   // Função para renderizar célula editável
@@ -369,189 +444,367 @@ export default function ReportBox({
 
                   {activeTab === "period" && (
                     <div className="space-y-6">
-                      {/* Formulário de Filtros */}
-                      <div className="bg-slate-800/50 rounded-lg border border-white/10 p-6">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <div>
-                            <label className="block text-xs text-slate-400 mb-1">
-                              Data Inicial
-                            </label>
-                            <input
-                              type="date"
-                              value={filters.dataInicial}
-                              onChange={(e) =>
-                                setFilters({
-                                  ...filters,
-                                  dataInicial: e.target.value,
-                                })
-                              }
-                              className="w-full px-3 py-2 bg-slate-900/50 border border-white/10 rounded-lg
-                                focus:outline-none focus:border-blue-500 text-slate-200"
-                            />
+                      {isLoadingPeriodReport ? (
+                        <div className="flex items-center justify-center p-8">
+                          <div className="flex flex-col items-center gap-4">
+                            <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                            <p className="text-slate-400">Carregando relatório completo...</p>
                           </div>
-                          <div>
-                            <label className="block text-xs text-slate-400 mb-1">
-                              Data Final
-                            </label>
-                            <input
-                              type="date"
-                              value={filters.dataFinal}
-                              onChange={(e) =>
-                                setFilters({
-                                  ...filters,
-                                  dataFinal: e.target.value,
-                                })
-                              }
-                              className="w-full px-3 py-2 bg-slate-900/50 border border-white/10 rounded-lg
-                                focus:outline-none focus:border-blue-500 text-slate-200"
-                            />
+                        </div>
+                      ) : error ? (
+                        <div className="flex items-center justify-center p-8">
+                          <div className="bg-rose-500/10 text-rose-400 px-4 py-3 rounded-lg border border-rose-500/20 backdrop-blur-sm">
+                            {error}
                           </div>
-                          <div>
-                            <label className="block text-xs text-slate-400 mb-1">
-                              Entregador
-                            </label>
-                            <select
-                              value={filters.entregador}
-                              onChange={(e) =>
-                                setFilters({
-                                  ...filters,
-                                  entregador: e.target.value,
-                                })
-                              }
-                              className="w-full px-3 py-2 bg-slate-900/50 border border-white/10 rounded-lg
-                                focus:outline-none focus:border-blue-500 text-slate-200"
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {sortedPeriodEntregas.map((entrega) => (
+                            <motion.div
+                              key={entrega.id}
+                              initial={false}
+                              animate={{ 
+                                backgroundColor: selectedEntregaId === entrega.id ? "rgba(30, 41, 59, 0.5)" : "rgba(15, 23, 42, 0.5)"
+                              }}
+                              className="border border-white/10 rounded-lg overflow-hidden backdrop-blur-sm"
                             >
-                              <option value="">Todos</option>
-                              <option value="João Silva">João Silva</option>
-                              <option value="Maria Santos">Maria Santos</option>
-                              <option value="Pedro Oliveira">
-                                Pedro Oliveira
-                              </option>
-                              <option value="Ana Costa">Ana Costa</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-xs text-slate-400 mb-1">
-                              Valor Mínimo
-                            </label>
-                            <div className="relative">
-                              <span className="absolute left-3 top-2 text-slate-400">
-                                R$
+                              {/* Cabeçalho do Acordeão */}
+                              <motion.button
+                                onClick={() => setSelectedEntregaId(selectedEntregaId === entrega.id ? null : (entrega.id || null))}
+                                className="w-full px-4 py-3 flex items-center justify-between gap-4 hover:bg-slate-800/50 transition-colors"
+                              >
+                                <div className="flex items-center gap-4 min-w-0">
+                                  <div className="flex-shrink-0">
+                                    <div className={`w-2 h-2 rounded-full ${
+                                      entrega.status === "Disponível" ? "bg-blue-400" :
+                                      entrega.status === "Andamento" ? "bg-amber-400" :
+                                      "bg-emerald-400"
+                                    }`} />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <h3 className="text-slate-200 font-medium truncate">{entrega.nome}</h3>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <span className="text-sm text-slate-400">{entrega.dia.join("/")}</span>
+                                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                    entrega.status === "Disponível" ? "bg-blue-400/10 text-blue-400" :
+                                    entrega.status === "Andamento" ? "bg-amber-400/10 text-amber-400" :
+                                    "bg-emerald-400/10 text-emerald-400"
+                                  }`}>
+                                    {entrega.status}
+                                  </span>
+                                  <motion.div
+                                    animate={{ rotate: selectedEntregaId === entrega.id ? 180 : 0 }}
+                                    transition={{ duration: 0.2 }}
+                                    className="w-5 h-5 text-slate-400"
+                                  >
+                                    <ChevronDownIcon className="w-5 h-5" />
+                                  </motion.div>
+                                </div>
+                              </motion.button>
+
+                              {/* Conteúdo Expandido */}
+                              <AnimatePresence>
+                                {selectedEntregaId === entrega.id && (
+                                  <motion.div
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: "auto", opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    transition={{ duration: 0.2 }}
+                                    className="border-t border-white/10 overflow-hidden"
+                                  >
+                                    <div className="px-4 py-3 space-y-4">
+                                      {/* Visualização dos Detalhes */}
+                                      {!editingCell && (
+                                        <>
+                                          <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                              <label className="text-xs text-slate-400">Telefone</label>
+                                              <p className="text-slate-200">{entrega.telefone || "-"}</p>
+                                            </div>
+                                            <div>
+                                              <label className="text-xs text-slate-400">Valor</label>
+                                              <p className="text-emerald-400 font-medium">R$ {entrega.valor}</p>
+                                            </div>
+                                            <div>
+                                              <label className="text-xs text-slate-400">Pagamento</label>
+                                              <p className="text-slate-200">{entrega.pagamento}</p>
+                                            </div>
+                                            <div>
+                                              <label className="text-xs text-slate-400">Status Pagamento</label>
+                                              <p className="text-slate-200">{entrega.statusPagamento}</p>
+                                            </div>
+                                            <div>
+                                              <label className="text-xs text-slate-400">Entregador</label>
+                                              <p className="text-slate-200">{entrega.entregador}</p>
+                                            </div>
+                                            <div>
+                                              <label className="text-xs text-slate-400">Volume</label>
+                                              <p className="text-slate-200">{entrega.volume}</p>
+                                            </div>
+                                          </div>
+
+                                          <div>
+                                            <label className="text-xs text-slate-400">Endereço</label>
+                                            <p className="text-slate-200">
+                                              {entrega.rua}, {entrega.numero}<br />
+                                              {entrega.bairro} - {entrega.cidade}
+                                            </p>
+                                          </div>
+
+                                          {entrega.observacoes && (
+                                            <div>
+                                              <label className="text-xs text-slate-400">Observações</label>
+                                              <p className="text-slate-200">{entrega.observacoes}</p>
+                                            </div>
+                                          )}
+
+                                          <div className="pt-2">
+                                            <div className="flex items-center gap-2 text-xs text-slate-400">
+                                              <ClockIcon className="w-4 h-4" />
+                                              <span>
+                                                Horário: {String(entrega.horario?.[0] || 0).padStart(2, '0')}:
+                                                {String(entrega.horario?.[1] || 0).padStart(2, '0')}
                               </span>
+                                            </div>
+                                          </div>
+
+                                          {/* Botão Atualizar Entrega */}
+                                          <div className="flex justify-end pt-4">
+                                            <motion.button
+                                              whileHover={{ scale: 1.02 }}
+                                              whileTap={{ scale: 0.98 }}
+                                              onClick={() => {
+                                                setFormEntrega({...entrega});
+                                                setEditingCell({ id: entrega.id!, field: "all", value: "" });
+                                              }}
+                                              className="px-4 py-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 
+                                                rounded-lg transition-all duration-300 flex items-center gap-2 
+                                                border border-blue-500/20 hover:border-blue-500/30"
+                                            >
+                                              <PencilSquareIcon className="w-4 h-4" />
+                                              <span>Atualizar Entrega</span>
+                                            </motion.button>
+                                          </div>
+                                        </>
+                                      )}
+
+                                      {/* Formulário de Edição */}
+                                      {editingCell?.id === entrega.id && formEntrega && (
+                                        <motion.div
+                                          initial={{ opacity: 0, y: 10 }}
+                                          animate={{ opacity: 1, y: 0 }}
+                                          className="space-y-4"
+                                        >
+                                          <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                              <label className="text-xs text-slate-400">Nome</label>
                               <input
-                                type="number"
-                                value={filters.valorMinimo}
-                                onChange={(e) =>
-                                  setFilters({
-                                    ...filters,
-                                    valorMinimo: e.target.value,
-                                  })
-                                }
-                                className="w-full pl-8 pr-3 py-2 bg-slate-900/50 border border-white/10 rounded-lg
-                                  focus:outline-none focus:border-blue-500 text-slate-200"
+                                                type="text"
+                                                value={formEntrega.nome}
+                                                onChange={(e) => {
+                                                  setFormEntrega({
+                                                    ...formEntrega,
+                                                    nome: e.target.value
+                                                  });
+                                                }}
+                                                className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 
+                                                  text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                               />
                             </div>
+                                            <div>
+                                              <label className="text-xs text-slate-400">Telefone</label>
+                                              <input
+                                                type="text"
+                                                value={formEntrega.telefone || ""}
+                                                onChange={(e) => {
+                                                  setFormEntrega({
+                                                    ...formEntrega,
+                                                    telefone: e.target.value
+                                                  });
+                                                }}
+                                                className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 
+                                                  text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                                              />
                           </div>
                           <div>
-                            <label className="block text-xs text-slate-400 mb-1">
-                              Valor Máximo
-                            </label>
-                            <div className="relative">
-                              <span className="absolute left-3 top-2 text-slate-400">
-                                R$
-                              </span>
+                                              <label className="text-xs text-slate-400">Valor</label>
                               <input
-                                type="number"
-                                value={filters.valorMaximo}
-                                onChange={(e) =>
-                                  setFilters({
-                                    ...filters,
-                                    valorMaximo: e.target.value,
-                                  })
-                                }
-                                className="w-full pl-8 pr-3 py-2 bg-slate-900/50 border border-white/10 rounded-lg
-                                  focus:outline-none focus:border-blue-500 text-slate-200"
+                                                type="text"
+                                                value={formEntrega.valor}
+                                                onChange={(e) => {
+                                                  setFormEntrega({
+                                                    ...formEntrega,
+                                                    valor: e.target.value
+                                                  });
+                                                }}
+                                                className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 
+                                                  text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                               />
                             </div>
+                                            <div>
+                                              <label className="text-xs text-slate-400">Pagamento</label>
+                                              <select
+                                                value={formEntrega.pagamento}
+                                                onChange={(e) => {
+                                                  setFormEntrega({
+                                                    ...formEntrega,
+                                                    pagamento: e.target.value
+                                                  });
+                                                }}
+                                                className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 
+                                                  text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                                              >
+                                                <option value="PIX">PIX</option>
+                                                <option value="Dinheiro">Dinheiro</option>
+                                                <option value="Cartão">Cartão</option>
+                                                <option value="Boleto">Boleto</option>
+                                              </select>
+                                            </div>
+                                            <div>
+                                              <label className="text-xs text-slate-400">Status Pagamento</label>
+                                              <select
+                                                value={formEntrega.statusPagamento || ""}
+                                                onChange={(e) => {
+                                                  setFormEntrega({
+                                                    ...formEntrega,
+                                                    statusPagamento: e.target.value
+                                                  });
+                                                }}
+                                                className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 
+                                                  text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                                              >
+                                                <option value="Aguardando">Aguardando</option>
+                                                <option value="Confirmado">Confirmado</option>
+                                              </select>
+                                            </div>
+                                            <div>
+                                              <label className="text-xs text-slate-400">Entregador</label>
+                                              <select
+                                                value={formEntrega.entregador}
+                                                onChange={(e) => {
+                                                  setFormEntrega({
+                                                    ...formEntrega,
+                                                    entregador: e.target.value
+                                                  });
+                                                }}
+                                                className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 
+                                                  text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                                              >
+                                                <option value="Marcos">Marcos Roberto</option>
+                                                <option value="Uene">Uene Passos</option>
+                                                <option value="Leo">Leo Henrique</option>
+                                              </select>
                           </div>
+                                            <div>
+                                              <label className="text-xs text-slate-400">Volume</label>
+                                              <select
+                                                value={formEntrega.volume}
+                                                onChange={(e) => {
+                                                  setFormEntrega({
+                                                    ...formEntrega,
+                                                    volume: e.target.value
+                                                  });
+                                                }}
+                                                className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 
+                                                  text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                                              >
+                                                <option value="Pequeno">Pequeno</option>
+                                                <option value="Médio">Médio</option>
+                                                <option value="Grande">Grande</option>
+                                              </select>
                         </div>
                       </div>
 
-                      {/* Tabela Filtrada */}
-                      <div className="rounded-lg border border-white/10 overflow-hidden">
-                        <table className="w-full">
-                          <thead>
-                            <tr className="bg-slate-800/50">
-                              <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
-                                Nome
-                              </th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
-                                Status
-                              </th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
-                                Data
-                              </th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
-                                Valor
-                              </th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
-                                Pagamento
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-white/5">
-                            {filteredEntregas.map((entrega) => (
-                              <tr
-                                key={entrega.id}
-                                className="hover:bg-slate-800/50 transition-colors"
-                              >
-                                <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                  {entrega.nome}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                  <span
-                                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                      ${
-                                        entrega.status === "Disponível"
-                                          ? "bg-blue-400/10 text-blue-400"
-                                          : entrega.status === "Andamento"
-                                          ? "bg-amber-400/10 text-amber-400"
-                                          : "bg-emerald-400/10 text-emerald-400"
-                                      }`}
-                                  >
-                                    {entrega.status}
-                                  </span>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
-                                  {entrega.dia.join("/")}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                  <span className="text-emerald-400">
-                                    R$ {entrega.valor}
-                                  </span>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
-                                  {entrega.pagamento}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                                          <div>
+                                            <label className="text-xs text-slate-400">Observações</label>
+                                            <textarea
+                                              value={formEntrega.observacoes || ""}
+                                              onChange={(e) => {
+                                                setFormEntrega({
+                                                  ...formEntrega,
+                                                  observacoes: e.target.value
+                                                });
+                                              }}
+                                              className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 
+                                                text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 
+                                                min-h-[80px] resize-none"
+                                            />
+                                          </div>
+
+                                          <div className="flex justify-end gap-2 pt-4">
+                                            <motion.button
+                                              whileHover={{ scale: 1.02 }}
+                                              whileTap={{ scale: 0.98 }}
+                                              onClick={() => {
+                                                if (socket && formEntrega) {
+                                                  setIsSaving(true);
+                                                  socket.emit("Atualizar Entrega", formEntrega);
+                                                }
+                                                setEditingCell(null);
+                                                setFormEntrega(null);
+                                              }}
+                                              className="px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 
+                                                rounded-lg transition-all duration-300 flex items-center gap-2 
+                                                border border-emerald-500/20 hover:border-emerald-500/30"
+                                            >
+                                              <CheckIcon className="w-4 h-4" />
+                                              <span>Salvar</span>
+                                            </motion.button>
+                                            <motion.button
+                                              whileHover={{ scale: 1.02 }}
+                                              whileTap={{ scale: 0.98 }}
+                                              onClick={() => {
+                                                setEditingCell(null);
+                                                setFormEntrega(null);
+                                              }}
+                                              className="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 
+                                                rounded-lg transition-all duration-300 flex items-center gap-2 
+                                                border border-rose-500/20 hover:border-rose-500/30"
+                                            >
+                                              <XIcon className="w-4 h-4" />
+                                              <span>Cancelar</span>
+                                            </motion.button>
+                                          </div>
+                                        </motion.div>
+                                      )}
+                                    </div>
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            </motion.div>
+                          ))}
                       </div>
+                      )}
                     </div>
                   )}
 
                   {activeTab === "charts" && (
                     <div className="text-slate-200">
-                      {/* Conteúdo dos Gráficos */}
-                      <p>Conteúdo dos Gráficos</p>
+                      {error ? (
+                        <div className="flex items-center justify-center p-8">
+                          <div className="bg-rose-500/10 text-rose-400 px-4 py-3 rounded-lg border border-rose-500/20 backdrop-blur-sm">
+                            {error}
+                          </div>
+                        </div>
+                      ) : (
+                        <ChartsReport entregas={chartEntregas} isLoading={isLoadingCharts} />
+                      )}
                     </div>
                   )}
 
                   {activeTab === "files" && (
                     <div className="text-slate-200">
-                      {/* Conteúdo dos Arquivos */}
-                      <p>Conteúdo dos Arquivos</p>
+                      {error ? (
+                        <div className="flex items-center justify-center p-8">
+                          <div className="bg-rose-500/10 text-rose-400 px-4 py-3 rounded-lg border border-rose-500/20 backdrop-blur-sm">
+                            {error}
+                          </div>
+                        </div>
+                      ) : (
+                        <FilesReport entregas={filesEntregas} isLoading={isLoadingFiles} />
+                      )}
                     </div>
                   )}
                 </motion.div>

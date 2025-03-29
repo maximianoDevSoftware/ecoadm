@@ -17,4 +17,7 @@ export type entregasTipo = {
   entregador: string;
   volume: string;
   observacoes?: string;
+  statusPagamento?: string;
+  horario?: [number, number]; // [horas, minutos]
+  statusMensagem?: string;
 };

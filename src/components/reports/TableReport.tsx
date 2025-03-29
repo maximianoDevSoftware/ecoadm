@@ -129,7 +129,7 @@ export default function TableReport({
                 });
               }
             }}
-            className="w-full bg-slate-800/50 border border-blue-500/30 rounded-lg px-2 py-0.5
+            className="min-w-[100px] w-full bg-slate-800/50 border border-blue-500/30 rounded-lg px-2 py-0.5
               text-sm text-slate-200 focus:outline-none focus:border-blue-500"
             autoFocus
           />
@@ -145,7 +145,7 @@ export default function TableReport({
                 });
               }
             }}
-            className="w-full bg-slate-800/50 border border-blue-500/30 rounded-lg px-2 py-0.5
+            className="min-w-[100px] w-full bg-slate-800/50 border border-blue-500/30 rounded-lg px-2 py-0.5
               text-sm text-slate-200 focus:outline-none focus:border-blue-500"
             autoFocus
           />

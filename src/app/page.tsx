@@ -74,7 +74,7 @@ export default function Login() {
     if (socket) return;
 
     // Inicializa a conexão socket
-    const socketInstance = io("https://web-production-0d584.up.railway.app/", {
+    const socketInstance = io("https://servidor-ecoclean-remaster-production.up.railway.app/", {
       transports: ["websocket"],
     });
 
@@ -87,22 +87,22 @@ export default function Login() {
         setConnectionStatus("Conectado ao servidor");
 
         // Emite as requisições iniciais
-        socketInstance.emit("Buscar Entregas");
+        socketInstance.emit("Entregas do Dia");
         setFetchingStatus(true);
 
         socketInstance.emit("Buscar Clientes");
         setFetchingClients(true);
 
-        socketInstance.emit("solicitar-usuarios");
+        socketInstance.emit("Buscar Usuarios");
         setFetchingUsers(true);
       });
 
       // Configuração dos listeners
-      socketInstance.on("Entregas Encontradas", updateEntregas);
-      socketInstance.on("Atualizando entregas", updateEntregas);
-      socketInstance.on("Clientes Encontrados", updateClientes);
+      socketInstance.on("Entregas do Dia", updateEntregas);
+      socketInstance.on("Buscar Clientes", updateClientes);
       socketInstance.on("Atualizando clientes", updateClientes);
-      socketInstance.on("todos-usuarios", updateUsers);
+      socketInstance.on("Atualizar Cliente", updateClientes);
+      socketInstance.on("Buscar Usuarios", updateUsers);
 
       socketInstance.on("disconnect", () => {
         console.log("Desconectado do servidor Socket.IO");
@@ -122,11 +122,11 @@ export default function Login() {
         socketInstance.off("connect");
         socketInstance.off("disconnect");
         socketInstance.off("connect_error");
-        socketInstance.off("Entregas Encontradas");
-        socketInstance.off("Atualizando entregas");
-        socketInstance.off("Clientes Encontrados");
+        socketInstance.off("Entregas do Dia");
+        socketInstance.off("Buscar Clientes");
         socketInstance.off("Atualizando clientes");
-        socketInstance.off("todos-usuarios");
+        socketInstance.off("Atualizar Cliente");
+        socketInstance.off("Buscar Usuarios");
         socketInstance.disconnect();
       }
     };
