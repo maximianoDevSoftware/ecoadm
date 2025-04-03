@@ -234,6 +234,9 @@ export default function TableReport({
                       Pagamento
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
+                      Status Pagamento
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
                       Entregador
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
@@ -293,6 +296,13 @@ export default function TableReport({
                           entrega={entrega}
                           field="pagamento"
                           value={entrega.pagamento}
+                        />
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <EditableCell
+                          entrega={entrega}
+                          field="statusPagamento"
+                          value={entrega.statusPagamento || "Aguardando"}
                         />
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">

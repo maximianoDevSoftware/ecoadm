@@ -942,6 +942,7 @@ export default function Map() {
   const { users, setUsers } = useUsers();
   const { entregas } = useEntregas();
   const [socket, setSocket] = useState<any>(null);
+  const mapRef = useRef<L.Map | null>(null);
 
   // Lista de usuários permitidos para ter marcadores
   const allowedUsers = ["Marcos", "Uene", "Leo"];
@@ -950,6 +951,98 @@ export default function Map() {
   const filteredUsers = users.filter((user) =>
     allowedUsers.includes(user.userName)
   );
+
+  // Hook para obter referência ao mapa
+  const MapRef = () => {
+    const map = useMap();
+    mapRef.current = map;
+    
+    // Adicionamos um listener para o evento personalizado
+    useEffect(() => {
+      const handleLocalizarEntrega = (event: any) => {
+        const { lat, lng } = event.detail;
+        console.log("Evento de localizar entrega recebido:", lat, lng);
+        
+        if (mapRef.current) {
+          // Animação fly to para as coordenadas
+          mapRef.current.flyTo([lat, lng], 18, {
+            duration: 1.5,
+            easeLinearity: 0.25
+          });
+          
+          // Mostrar um marcador temporário pulsante
+          const marker = L.marker([lat, lng], {
+            icon: L.divIcon({
+              html: `<div class="pulse-marker"></div>`,
+              className: "",
+              iconSize: [30, 30],
+              iconAnchor: [15, 15]
+            })
+          }).addTo(mapRef.current);
+          
+          // Adicionar estilo do marcador pulsante se ainda não existir
+          if (!document.getElementById('pulse-marker-style')) {
+            const style = document.createElement('style');
+            style.id = 'pulse-marker-style';
+            style.innerHTML = `
+              .pulse-marker {
+                width: 30px;
+                height: 30px;
+                border-radius: 50%;
+                background-color: rgba(79, 70, 229, 0.3);
+                box-shadow: 0 0 0 rgba(79, 70, 229, 0.4);
+                animation: pulse 1.5s infinite;
+              }
+              
+              @keyframes pulse {
+                0% {
+                  box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.6);
+                }
+                70% {
+                  box-shadow: 0 0 0 20px rgba(79, 70, 229, 0);
+                }
+                100% {
+                  box-shadow: 0 0 0 0 rgba(79, 70, 229, 0);
+                }
+              }
+            `;
+            document.head.appendChild(style);
+          }
+          
+          // Remover o marcador após 5 segundos
+          setTimeout(() => {
+            if (mapRef.current) {
+              mapRef.current.removeLayer(marker);
+            }
+          }, 5000);
+        }
+      };
+      
+      // Também verificar o localStorage ao montar o componente
+      const savedCoords = localStorage.getItem('localizarEntrega');
+      if (savedCoords && mapRef.current) {
+        try {
+          const { lat, lng } = JSON.parse(savedCoords);
+          setTimeout(() => {
+            if (mapRef.current) {
+              mapRef.current.flyTo([lat, lng], 18, {
+                duration: 1.5,
+                easeLinearity: 0.25
+              });
+            }
+          }, 500); // Pequeno delay para garantir que o mapa está pronto
+          localStorage.removeItem('localizarEntrega'); // Limpar após uso
+        } catch (e) {
+          console.error("Erro ao ler coordenadas do localStorage", e);
+        }
+      }
+      
+      window.addEventListener('localizarEntregaNoMapa', handleLocalizarEntrega);
+      return () => window.removeEventListener('localizarEntregaNoMapa', handleLocalizarEntrega);
+    }, []);
+    
+    return null;
+  };
 
   useEffect(() => {
     const newSocket = io("https://servidor-ecoclean-remaster-production.up.railway.app/");
@@ -967,6 +1060,7 @@ export default function Map() {
     });
 
     return () => {
+      newSocket.off("Buscar Usuarios");
       newSocket.close();
     };
   }, [setUsers]);
@@ -1002,6 +1096,7 @@ export default function Map() {
         zoomControl={false}
         style={{ height: "100%", width: "100%" }}
       >
+        <MapRef />
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
         {/* Componente de Rotas */}

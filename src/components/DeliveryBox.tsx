@@ -124,6 +124,11 @@ export default function DeliveryBox({
       label: "Editar Cliente",
       color: "bg-purple-500/10 text-purple-500 hover:bg-purple-500/20",
     },
+    {
+      icon: MapPinIcon,
+      label: "Localizar Entrega",
+      color: "bg-indigo-500/10 text-indigo-500 hover:bg-indigo-500/20",
+    },
   ];
 
   const availableUsers = [
@@ -373,6 +378,27 @@ export default function DeliveryBox({
                                       selectedDelivery
                                     ) {
                                       handleInformEntregador(selectedDelivery);
+                                    } else if (
+                                      button.label === "Localizar Entrega" &&
+                                      delivery.coordenadas
+                                    ) {
+                                      // Salvamos as coordenadas no localStorage para o Map.tsx usar
+                                      localStorage.setItem('localizarEntrega', JSON.stringify({
+                                        lat: delivery.coordenadas.latitude,
+                                        lng: delivery.coordenadas.longitude
+                                      }));
+                                      
+                                      // Disparamos um evento personalizado que o Map.tsx pode escutar
+                                      const event = new CustomEvent('localizarEntregaNoMapa', {
+                                        detail: {
+                                          lat: delivery.coordenadas.latitude,
+                                          lng: delivery.coordenadas.longitude
+                                        }
+                                      });
+                                      window.dispatchEvent(event);
+                                      
+                                      // Fechar o painel de entregas
+                                      onClose();
                                     }
                                   }}
                                   className={`relative group p-2 rounded-lg ${button.color} transition-all duration-200`}

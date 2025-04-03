@@ -20,6 +20,7 @@ import { useEntregas } from "@/contexts/EntregasContext";
 import TableReport from "./reports/TableReport";
 import ChartsReport from "./reports/ChartsReport";
 import FilesReport from "./reports/FilesReport";
+import PeriodReport from "./reports/PeriodReport";
 
 interface ReportBoxProps {
   isOpen: boolean;
@@ -57,13 +58,14 @@ export default function ReportBox({
   const [isLoadingFiles, setIsLoadingFiles] = useState(false);
   const [filesEntregas, setFilesEntregas] = useState<entregasTipo[]>([]);
 
-  // Estados para os filtros
-  const [filters, setFilters] = useState({
+  // Estado para os filtros do período
+  const [periodFilters, setPeriodFilters] = useState({
     dataInicial: "",
     dataFinal: "",
     valorMinimo: "",
     valorMaximo: "",
     entregador: "",
+    pagamento: "",
   });
 
   const tabs = [
@@ -181,18 +183,19 @@ export default function ReportBox({
       entrega.dia[1] - 1,
       entrega.dia[2]
     );
-    const dataInicial = filters.dataInicial
-      ? new Date(filters.dataInicial)
+    const dataInicial = periodFilters.dataInicial
+      ? new Date(periodFilters.dataInicial)
       : null;
-    const dataFinal = filters.dataFinal ? new Date(filters.dataFinal) : null;
+    const dataFinal = periodFilters.dataFinal ? new Date(periodFilters.dataFinal) : null;
     const valor = parseFloat(entrega.valor.replace(",", "."));
 
     return (
       (!dataInicial || entregaDate >= dataInicial) &&
       (!dataFinal || entregaDate <= dataFinal) &&
-      (!filters.valorMinimo || valor >= parseFloat(filters.valorMinimo)) &&
-      (!filters.valorMaximo || valor <= parseFloat(filters.valorMaximo)) &&
-      (!filters.entregador || entrega.entregador === filters.entregador)
+      (!periodFilters.valorMinimo || valor >= parseFloat(periodFilters.valorMinimo)) &&
+      (!periodFilters.valorMaximo || valor <= parseFloat(periodFilters.valorMaximo)) &&
+      (!periodFilters.entregador || entrega.entregador === periodFilters.entregador) &&
+      (!periodFilters.pagamento || entrega.pagamento === periodFilters.pagamento)
     );
   });
 
@@ -443,340 +446,12 @@ export default function ReportBox({
                   )}
 
                   {activeTab === "period" && (
-                    <div className="space-y-6">
-                      {isLoadingPeriodReport ? (
-                        <div className="flex items-center justify-center p-8">
-                          <div className="flex flex-col items-center gap-4">
-                            <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                            <p className="text-slate-400">Carregando relatório completo...</p>
-                          </div>
-                        </div>
-                      ) : error ? (
-                        <div className="flex items-center justify-center p-8">
-                          <div className="bg-rose-500/10 text-rose-400 px-4 py-3 rounded-lg border border-rose-500/20 backdrop-blur-sm">
-                            {error}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
-                          {sortedPeriodEntregas.map((entrega) => (
-                            <motion.div
-                              key={entrega.id}
-                              initial={false}
-                              animate={{ 
-                                backgroundColor: selectedEntregaId === entrega.id ? "rgba(30, 41, 59, 0.5)" : "rgba(15, 23, 42, 0.5)"
-                              }}
-                              className="border border-white/10 rounded-lg overflow-hidden backdrop-blur-sm"
-                            >
-                              {/* Cabeçalho do Acordeão */}
-                              <motion.button
-                                onClick={() => setSelectedEntregaId(selectedEntregaId === entrega.id ? null : (entrega.id || null))}
-                                className="w-full px-4 py-3 flex items-center justify-between gap-4 hover:bg-slate-800/50 transition-colors"
-                              >
-                                <div className="flex items-center gap-4 min-w-0">
-                                  <div className="flex-shrink-0">
-                                    <div className={`w-2 h-2 rounded-full ${
-                                      entrega.status === "Disponível" ? "bg-blue-400" :
-                                      entrega.status === "Andamento" ? "bg-amber-400" :
-                                      "bg-emerald-400"
-                                    }`} />
-                                  </div>
-                                  <div className="min-w-0">
-                                    <h3 className="text-slate-200 font-medium truncate">{entrega.nome}</h3>
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                  <span className="text-sm text-slate-400">{entrega.dia.join("/")}</span>
-                                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                    entrega.status === "Disponível" ? "bg-blue-400/10 text-blue-400" :
-                                    entrega.status === "Andamento" ? "bg-amber-400/10 text-amber-400" :
-                                    "bg-emerald-400/10 text-emerald-400"
-                                  }`}>
-                                    {entrega.status}
-                                  </span>
-                                  <motion.div
-                                    animate={{ rotate: selectedEntregaId === entrega.id ? 180 : 0 }}
-                                    transition={{ duration: 0.2 }}
-                                    className="w-5 h-5 text-slate-400"
-                                  >
-                                    <ChevronDownIcon className="w-5 h-5" />
-                                  </motion.div>
-                                </div>
-                              </motion.button>
-
-                              {/* Conteúdo Expandido */}
-                              <AnimatePresence>
-                                {selectedEntregaId === entrega.id && (
-                                  <motion.div
-                                    initial={{ height: 0, opacity: 0 }}
-                                    animate={{ height: "auto", opacity: 1 }}
-                                    exit={{ height: 0, opacity: 0 }}
-                                    transition={{ duration: 0.2 }}
-                                    className="border-t border-white/10 overflow-hidden"
-                                  >
-                                    <div className="px-4 py-3 space-y-4">
-                                      {/* Visualização dos Detalhes */}
-                                      {!editingCell && (
-                                        <>
-                                          <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                              <label className="text-xs text-slate-400">Telefone</label>
-                                              <p className="text-slate-200">{entrega.telefone || "-"}</p>
-                                            </div>
-                                            <div>
-                                              <label className="text-xs text-slate-400">Valor</label>
-                                              <p className="text-emerald-400 font-medium">R$ {entrega.valor}</p>
-                                            </div>
-                                            <div>
-                                              <label className="text-xs text-slate-400">Pagamento</label>
-                                              <p className="text-slate-200">{entrega.pagamento}</p>
-                                            </div>
-                                            <div>
-                                              <label className="text-xs text-slate-400">Status Pagamento</label>
-                                              <p className="text-slate-200">{entrega.statusPagamento}</p>
-                                            </div>
-                                            <div>
-                                              <label className="text-xs text-slate-400">Entregador</label>
-                                              <p className="text-slate-200">{entrega.entregador}</p>
-                                            </div>
-                                            <div>
-                                              <label className="text-xs text-slate-400">Volume</label>
-                                              <p className="text-slate-200">{entrega.volume}</p>
-                                            </div>
-                                          </div>
-
-                                          <div>
-                                            <label className="text-xs text-slate-400">Endereço</label>
-                                            <p className="text-slate-200">
-                                              {entrega.rua}, {entrega.numero}<br />
-                                              {entrega.bairro} - {entrega.cidade}
-                                            </p>
-                                          </div>
-
-                                          {entrega.observacoes && (
-                                            <div>
-                                              <label className="text-xs text-slate-400">Observações</label>
-                                              <p className="text-slate-200">{entrega.observacoes}</p>
-                                            </div>
-                                          )}
-
-                                          <div className="pt-2">
-                                            <div className="flex items-center gap-2 text-xs text-slate-400">
-                                              <ClockIcon className="w-4 h-4" />
-                                              <span>
-                                                Horário: {String(entrega.horario?.[0] || 0).padStart(2, '0')}:
-                                                {String(entrega.horario?.[1] || 0).padStart(2, '0')}
-                              </span>
-                                            </div>
-                                          </div>
-
-                                          {/* Botão Atualizar Entrega */}
-                                          <div className="flex justify-end pt-4">
-                                            <motion.button
-                                              whileHover={{ scale: 1.02 }}
-                                              whileTap={{ scale: 0.98 }}
-                                              onClick={() => {
-                                                setFormEntrega({...entrega});
-                                                setEditingCell({ id: entrega.id!, field: "all", value: "" });
-                                              }}
-                                              className="px-4 py-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 
-                                                rounded-lg transition-all duration-300 flex items-center gap-2 
-                                                border border-blue-500/20 hover:border-blue-500/30"
-                                            >
-                                              <PencilSquareIcon className="w-4 h-4" />
-                                              <span>Atualizar Entrega</span>
-                                            </motion.button>
-                                          </div>
-                                        </>
-                                      )}
-
-                                      {/* Formulário de Edição */}
-                                      {editingCell?.id === entrega.id && formEntrega && (
-                                        <motion.div
-                                          initial={{ opacity: 0, y: 10 }}
-                                          animate={{ opacity: 1, y: 0 }}
-                                          className="space-y-4"
-                                        >
-                                          <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                              <label className="text-xs text-slate-400">Nome</label>
-                              <input
-                                                type="text"
-                                                value={formEntrega.nome}
-                                                onChange={(e) => {
-                                                  setFormEntrega({
-                                                    ...formEntrega,
-                                                    nome: e.target.value
-                                                  });
-                                                }}
-                                                className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 
-                                                  text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                              />
-                            </div>
-                                            <div>
-                                              <label className="text-xs text-slate-400">Telefone</label>
-                                              <input
-                                                type="text"
-                                                value={formEntrega.telefone || ""}
-                                                onChange={(e) => {
-                                                  setFormEntrega({
-                                                    ...formEntrega,
-                                                    telefone: e.target.value
-                                                  });
-                                                }}
-                                                className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 
-                                                  text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                                              />
-                          </div>
-                          <div>
-                                              <label className="text-xs text-slate-400">Valor</label>
-                              <input
-                                                type="text"
-                                                value={formEntrega.valor}
-                                                onChange={(e) => {
-                                                  setFormEntrega({
-                                                    ...formEntrega,
-                                                    valor: e.target.value
-                                                  });
-                                                }}
-                                                className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 
-                                                  text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                              />
-                            </div>
-                                            <div>
-                                              <label className="text-xs text-slate-400">Pagamento</label>
-                                              <select
-                                                value={formEntrega.pagamento}
-                                                onChange={(e) => {
-                                                  setFormEntrega({
-                                                    ...formEntrega,
-                                                    pagamento: e.target.value
-                                                  });
-                                                }}
-                                                className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 
-                                                  text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                                              >
-                                                <option value="PIX">PIX</option>
-                                                <option value="Dinheiro">Dinheiro</option>
-                                                <option value="Cartão">Cartão</option>
-                                                <option value="Boleto">Boleto</option>
-                                              </select>
-                                            </div>
-                                            <div>
-                                              <label className="text-xs text-slate-400">Status Pagamento</label>
-                                              <select
-                                                value={formEntrega.statusPagamento || ""}
-                                                onChange={(e) => {
-                                                  setFormEntrega({
-                                                    ...formEntrega,
-                                                    statusPagamento: e.target.value
-                                                  });
-                                                }}
-                                                className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 
-                                                  text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                                              >
-                                                <option value="Aguardando">Aguardando</option>
-                                                <option value="Confirmado">Confirmado</option>
-                                              </select>
-                                            </div>
-                                            <div>
-                                              <label className="text-xs text-slate-400">Entregador</label>
-                                              <select
-                                                value={formEntrega.entregador}
-                                                onChange={(e) => {
-                                                  setFormEntrega({
-                                                    ...formEntrega,
-                                                    entregador: e.target.value
-                                                  });
-                                                }}
-                                                className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 
-                                                  text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                                              >
-                                                <option value="Marcos">Marcos Roberto</option>
-                                                <option value="Uene">Uene Passos</option>
-                                                <option value="Leo">Leo Henrique</option>
-                                              </select>
-                          </div>
-                                            <div>
-                                              <label className="text-xs text-slate-400">Volume</label>
-                                              <select
-                                                value={formEntrega.volume}
-                                                onChange={(e) => {
-                                                  setFormEntrega({
-                                                    ...formEntrega,
-                                                    volume: e.target.value
-                                                  });
-                                                }}
-                                                className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 
-                                                  text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                                              >
-                                                <option value="Pequeno">Pequeno</option>
-                                                <option value="Médio">Médio</option>
-                                                <option value="Grande">Grande</option>
-                                              </select>
-                        </div>
-                      </div>
-
-                                          <div>
-                                            <label className="text-xs text-slate-400">Observações</label>
-                                            <textarea
-                                              value={formEntrega.observacoes || ""}
-                                              onChange={(e) => {
-                                                setFormEntrega({
-                                                  ...formEntrega,
-                                                  observacoes: e.target.value
-                                                });
-                                              }}
-                                              className="w-full bg-slate-800/50 border border-white/10 rounded-lg px-3 py-2 
-                                                text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 
-                                                min-h-[80px] resize-none"
-                                            />
-                                          </div>
-
-                                          <div className="flex justify-end gap-2 pt-4">
-                                            <motion.button
-                                              whileHover={{ scale: 1.02 }}
-                                              whileTap={{ scale: 0.98 }}
-                                              onClick={() => {
-                                                if (socket && formEntrega) {
-                                                  setIsSaving(true);
-                                                  socket.emit("Atualizar Entrega", formEntrega);
-                                                }
-                                                setEditingCell(null);
-                                                setFormEntrega(null);
-                                              }}
-                                              className="px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 
-                                                rounded-lg transition-all duration-300 flex items-center gap-2 
-                                                border border-emerald-500/20 hover:border-emerald-500/30"
-                                            >
-                                              <CheckIcon className="w-4 h-4" />
-                                              <span>Salvar</span>
-                                            </motion.button>
-                                            <motion.button
-                                              whileHover={{ scale: 1.02 }}
-                                              whileTap={{ scale: 0.98 }}
-                                              onClick={() => {
-                                                setEditingCell(null);
-                                                setFormEntrega(null);
-                                              }}
-                                              className="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 
-                                                rounded-lg transition-all duration-300 flex items-center gap-2 
-                                                border border-rose-500/20 hover:border-rose-500/30"
-                                            >
-                                              <XIcon className="w-4 h-4" />
-                                              <span>Cancelar</span>
-                                            </motion.button>
-                                          </div>
-                                        </motion.div>
-                                      )}
-                                    </div>
-                                  </motion.div>
-                                )}
-                              </AnimatePresence>
-                            </motion.div>
-                          ))}
-                      </div>
-                      )}
+                    <div className="flex-1 overflow-y-auto pr-2">
+                      <PeriodReport 
+                        entregas={periodEntregas} 
+                        filters={periodFilters} 
+                        setFilters={setPeriodFilters} 
+                      />
                     </div>
                   )}
 
@@ -816,3 +491,4 @@ export default function ReportBox({
     </AnimatePresence>
   );
 }
+
